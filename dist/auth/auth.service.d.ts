@@ -1,0 +1,30 @@
+import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { User } from '../entities/user.entity';
+import { PasswordReset } from '../entities/password-reset.entity';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AuthResponseDto } from '../common/dto/auth-response.dto';
+import { EmailService } from '../common/services/email.service';
+export declare class AuthService {
+    private userRepository;
+    private passwordResetRepository;
+    private jwtService;
+    private configService;
+    private emailService;
+    constructor(userRepository: Repository<User>, passwordResetRepository: Repository<PasswordReset>, jwtService: JwtService, configService: ConfigService, emailService: EmailService);
+    register(registerDto: RegisterDto): Promise<AuthResponseDto>;
+    login(loginDto: LoginDto): Promise<AuthResponseDto>;
+    logout(userId: string): Promise<void>;
+    refreshToken(refreshToken: string): Promise<AuthResponseDto>;
+    forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<void>;
+    resetPassword(resetPasswordDto: ResetPasswordDto): Promise<void>;
+    changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<void>;
+    validateUserById(userId: string): Promise<User | null>;
+    private generateTokens;
+    private sanitizeUser;
+}
