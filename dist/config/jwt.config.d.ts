@@ -1,8 +1,2 @@
-declare const _default: (() => {
-    secret: string;
-    expiresIn: string;
-}) & import("@nestjs/config").ConfigFactoryKeyHost<{
-    secret: string;
-    expiresIn: string;
-}>;
+declare const _default: any;
 export default _default;
