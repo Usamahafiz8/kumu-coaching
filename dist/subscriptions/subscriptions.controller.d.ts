@@ -1,6 +1,9 @@
 import { SubscriptionsService } from './subscriptions.service';
 import { PurchaseSubscriptionDto } from './dto/purchase-subscription.dto';
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
+import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
+import { PaymentResponseDto } from './dto/payment-response.dto';
 import { User } from '../entities/user.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { Subscription } from '../entities/subscription.entity';
@@ -14,4 +17,6 @@ export declare class SubscriptionsController {
     getSubscriptionStatus(user: User): Promise<ApiResponseDto>;
     getSubscriptionHistory(user: User): Promise<ApiResponseDto<Subscription[]>>;
     cancelSubscription(user: User, cancelDto: CancelSubscriptionDto): Promise<ApiResponseDto<Subscription>>;
+    createPaymentIntent(user: User, createPaymentIntentDto: CreatePaymentIntentDto): Promise<ApiResponseDto<PaymentResponseDto>>;
+    confirmPayment(user: User, confirmPaymentDto: ConfirmPaymentDto): Promise<ApiResponseDto<Subscription>>;
 }

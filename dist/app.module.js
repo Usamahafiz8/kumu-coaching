@@ -27,6 +27,7 @@ const password_reset_entity_1 = require("./entities/password-reset.entity");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
 const database_config_1 = __importDefault(require("./config/database.config"));
 const jwt_config_1 = __importDefault(require("./config/jwt.config"));
+const stripe_config_1 = __importDefault(require("./config/stripe.config"));
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,7 +36,7 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
-                load: [database_config_1.default, jwt_config_1.default],
+                load: [database_config_1.default, jwt_config_1.default, stripe_config_1.default],
                 envFilePath: ['.env.local', '.env'],
             }),
             typeorm_1.TypeOrmModule.forRootAsync({

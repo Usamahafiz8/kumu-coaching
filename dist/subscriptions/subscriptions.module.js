@@ -11,10 +11,13 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const subscriptions_controller_1 = require("./subscriptions.controller");
 const subscriptions_service_1 = require("./subscriptions.service");
+const webhooks_controller_1 = require("./webhooks.controller");
 const user_entity_1 = require("../entities/user.entity");
 const subscription_plan_entity_1 = require("../entities/subscription-plan.entity");
 const subscription_entity_1 = require("../entities/subscription.entity");
 const auth_module_1 = require("../auth/auth.module");
+const stripe_service_1 = require("../common/services/stripe.service");
+const email_service_1 = require("../common/services/email.service");
 let SubscriptionsModule = class SubscriptionsModule {
 };
 exports.SubscriptionsModule = SubscriptionsModule;
@@ -24,8 +27,8 @@ exports.SubscriptionsModule = SubscriptionsModule = __decorate([
             typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, subscription_plan_entity_1.SubscriptionPlan, subscription_entity_1.Subscription]),
             auth_module_1.AuthModule,
         ],
-        controllers: [subscriptions_controller_1.SubscriptionsController],
-        providers: [subscriptions_service_1.SubscriptionsService],
+        controllers: [subscriptions_controller_1.SubscriptionsController, webhooks_controller_1.WebhooksController],
+        providers: [subscriptions_service_1.SubscriptionsService, stripe_service_1.StripeService, email_service_1.EmailService],
         exports: [subscriptions_service_1.SubscriptionsService],
     })
 ], SubscriptionsModule);

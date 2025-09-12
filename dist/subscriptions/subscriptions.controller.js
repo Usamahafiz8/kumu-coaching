@@ -20,6 +20,8 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const purchase_subscription_dto_1 = require("./dto/purchase-subscription.dto");
 const cancel_subscription_dto_1 = require("./dto/cancel-subscription.dto");
+const create_payment_intent_dto_1 = require("./dto/create-payment-intent.dto");
+const confirm_payment_dto_1 = require("./dto/confirm-payment.dto");
 const user_entity_1 = require("../entities/user.entity");
 const api_response_dto_1 = require("../common/dto/api-response.dto");
 let SubscriptionsController = class SubscriptionsController {
@@ -50,6 +52,14 @@ let SubscriptionsController = class SubscriptionsController {
     async cancelSubscription(user, cancelDto) {
         const subscription = await this.subscriptionsService.cancelSubscription(user.id, cancelDto);
         return new api_response_dto_1.ApiResponseDto(true, 'Subscription cancelled successfully', subscription);
+    }
+    async createPaymentIntent(user, createPaymentIntentDto) {
+        const paymentResponse = await this.subscriptionsService.createPaymentIntent(user.id, createPaymentIntentDto);
+        return new api_response_dto_1.ApiResponseDto(true, 'Payment intent created successfully', paymentResponse);
+    }
+    async confirmPayment(user, confirmPaymentDto) {
+        const subscription = await this.subscriptionsService.confirmPayment(user.id, confirmPaymentDto);
+        return new api_response_dto_1.ApiResponseDto(true, 'Payment confirmed and subscription activated successfully', subscription);
     }
 };
 exports.SubscriptionsController = SubscriptionsController;
@@ -187,6 +197,68 @@ __decorate([
         cancel_subscription_dto_1.CancelSubscriptionDto]),
     __metadata("design:returntype", Promise)
 ], SubscriptionsController.prototype, "cancelSubscription", null);
+__decorate([
+    (0, common_1.Post)('create-payment-intent'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'Create Stripe payment intent for subscription' }),
+    (0, swagger_1.ApiResponse)({
+        status: 201,
+        description: 'Payment intent created successfully',
+        type: api_response_dto_1.ApiResponseDto,
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Invalid input data',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 401,
+        description: 'Unauthorized',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 404,
+        description: 'Subscription plan not found',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 409,
+        description: 'User already has an active subscription',
+    }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User,
+        create_payment_intent_dto_1.CreatePaymentIntentDto]),
+    __metadata("design:returntype", Promise)
+], SubscriptionsController.prototype, "createPaymentIntent", null);
+__decorate([
+    (0, common_1.Post)('confirm-payment'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'Confirm payment and activate subscription' }),
+    (0, swagger_1.ApiResponse)({
+        status: 201,
+        description: 'Payment confirmed and subscription activated successfully',
+        type: api_response_dto_1.ApiResponseDto,
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Invalid payment or payment not completed',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 401,
+        description: 'Unauthorized',
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 404,
+        description: 'Payment intent not found',
+    }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [user_entity_1.User,
+        confirm_payment_dto_1.ConfirmPaymentDto]),
+    __metadata("design:returntype", Promise)
+], SubscriptionsController.prototype, "confirmPayment", null);
 exports.SubscriptionsController = SubscriptionsController = __decorate([
     (0, swagger_1.ApiTags)('Subscriptions'),
     (0, common_1.Controller)('subscriptions'),

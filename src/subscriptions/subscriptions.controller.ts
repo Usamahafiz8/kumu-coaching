@@ -21,6 +21,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PurchaseSubscriptionDto } from './dto/purchase-subscription.dto';
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
+import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
+import { PaymentResponseDto } from './dto/payment-response.dto';
 import { User } from '../entities/user.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { Subscription } from '../entities/subscription.entity';
@@ -168,5 +171,73 @@ export class SubscriptionsController {
       cancelDto,
     );
     return new ApiResponseDto(true, 'Subscription cancelled successfully', subscription);
+  }
+
+  @Post('create-payment-intent')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create Stripe payment intent for subscription' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment intent created successfully',
+    type: ApiResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Subscription plan not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'User already has an active subscription',
+  })
+  async createPaymentIntent(
+    @CurrentUser() user: User,
+    @Body() createPaymentIntentDto: CreatePaymentIntentDto,
+  ): Promise<ApiResponseDto<PaymentResponseDto>> {
+    const paymentResponse = await this.subscriptionsService.createPaymentIntent(
+      user.id,
+      createPaymentIntentDto,
+    );
+    return new ApiResponseDto(true, 'Payment intent created successfully', paymentResponse);
+  }
+
+  @Post('confirm-payment')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Confirm payment and activate subscription' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment confirmed and subscription activated successfully',
+    type: ApiResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid payment or payment not completed',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Payment intent not found',
+  })
+  async confirmPayment(
+    @CurrentUser() user: User,
+    @Body() confirmPaymentDto: ConfirmPaymentDto,
+  ): Promise<ApiResponseDto<Subscription>> {
+    const subscription = await this.subscriptionsService.confirmPayment(
+      user.id,
+      confirmPaymentDto,
+    );
+    return new ApiResponseDto(true, 'Payment confirmed and subscription activated successfully', subscription);
   }
 }
