@@ -5,15 +5,15 @@ export default registerAs(
   'database',
   (): TypeOrmModuleOptions => ({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || 'database-3.chgki6kqcigb.eu-north-1.rds.amazonaws.com',
     port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME || 'cybillnerd',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'kumu_coaching',
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || '90E9hC6LEWhVcivMerwh',
+    database: process.env.DB_NAME || 'postgres',
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: process.env.NODE_ENV === 'development',
     logging: process.env.NODE_ENV === 'development',
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl:   { rejectUnauthorized: false } ,
     // Connection timeout and pool configuration
     connectTimeoutMS: 30000, // 30 seconds connection timeout
     extra: {
