@@ -43,7 +43,7 @@ let ProfileService = class ProfileService {
         return this.sanitizeUser(updatedUser);
     }
     sanitizeUser(user) {
-        const { password, refreshToken, ...sanitizedUser } = user;
+        const { password, ...sanitizedUser } = user;
         return sanitizedUser;
     }
 };

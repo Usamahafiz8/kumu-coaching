@@ -93,10 +93,6 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user);
 
-    // Update refresh token in database
-    await this.userRepository.update(user.id, {
-      refreshToken: tokens.refreshToken,
-    });
 
     return {
       ...tokens,
@@ -105,40 +101,9 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
-      refreshToken: null,
-    });
+    // No-op since we're not using refresh tokens
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('jwt.refreshSecret'),
-      });
-
-      const user = await this.userRepository.findOne({
-        where: { id: payload.sub, refreshToken },
-      });
-
-      if (!user) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
-      const tokens = await this.generateTokens(user);
-
-      // Update refresh token in database
-      await this.userRepository.update(user.id, {
-        refreshToken: tokens.refreshToken,
-      });
-
-      return {
-        ...tokens,
-        user: this.sanitizeUser(user),
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-  }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<void> {
     const { email } = forgotPasswordDto;
@@ -231,26 +196,19 @@ export class AuthService {
       role: user.role,
     };
 
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('jwt.secret'),
-        expiresIn: this.configService.get<string>('jwt.expiresIn'),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('jwt.refreshSecret'),
-        expiresIn: this.configService.get<string>('jwt.refreshExpiresIn'),
-      }),
-    ]);
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('jwt.secret'),
+      expiresIn: this.configService.get<string>('jwt.expiresIn'),
+    });
 
     return {
       accessToken,
-      refreshToken,
       expiresIn: 3600, // 1 hour in seconds
     };
   }
 
   private sanitizeUser(user: User): Partial<User> {
-    const { password, refreshToken, ...sanitizedUser } = user;
+    const { password, ...sanitizedUser } = user;
     return sanitizedUser;
   }
 }

@@ -74,42 +74,12 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const tokens = await this.generateTokens(user);
-        await this.userRepository.update(user.id, {
-            refreshToken: tokens.refreshToken,
-        });
         return {
             ...tokens,
             user: this.sanitizeUser(user),
         };
     }
     async logout(userId) {
-        await this.userRepository.update(userId, {
-            refreshToken: null,
-        });
-    }
-    async refreshToken(refreshToken) {
-        try {
-            const payload = this.jwtService.verify(refreshToken, {
-                secret: this.configService.get('jwt.refreshSecret'),
-            });
-            const user = await this.userRepository.findOne({
-                where: { id: payload.sub, refreshToken },
-            });
-            if (!user) {
-                throw new common_1.UnauthorizedException('Invalid refresh token');
-            }
-            const tokens = await this.generateTokens(user);
-            await this.userRepository.update(user.id, {
-                refreshToken: tokens.refreshToken,
-            });
-            return {
-                ...tokens,
-                user: this.sanitizeUser(user),
-            };
-        }
-        catch (error) {
-            throw new common_1.UnauthorizedException('Invalid refresh token');
-        }
     }
     async forgotPassword(forgotPasswordDto) {
         const { email } = forgotPasswordDto;
@@ -172,24 +142,17 @@ let AuthService = class AuthService {
             email: user.email,
             role: user.role,
         };
-        const [accessToken, refreshToken] = await Promise.all([
-            this.jwtService.signAsync(payload, {
-                secret: this.configService.get('jwt.secret'),
-                expiresIn: this.configService.get('jwt.expiresIn'),
-            }),
-            this.jwtService.signAsync(payload, {
-                secret: this.configService.get('jwt.refreshSecret'),
-                expiresIn: this.configService.get('jwt.refreshExpiresIn'),
-            }),
-        ]);
+        const accessToken = await this.jwtService.signAsync(payload, {
+            secret: this.configService.get('jwt.secret'),
+            expiresIn: this.configService.get('jwt.expiresIn'),
+        });
         return {
             accessToken,
-            refreshToken,
             expiresIn: 3600,
         };
     }
     sanitizeUser(user) {
-        const { password, refreshToken, ...sanitizedUser } = user;
+        const { password, ...sanitizedUser } = user;
         return sanitizedUser;
     }
 };

@@ -20,7 +20,6 @@ export declare class AuthService {
     register(registerDto: RegisterDto): Promise<AuthResponseDto>;
     login(loginDto: LoginDto): Promise<AuthResponseDto>;
     logout(userId: string): Promise<void>;
-    refreshToken(refreshToken: string): Promise<AuthResponseDto>;
     forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<void>;
     resetPassword(resetPasswordDto: ResetPasswordDto): Promise<void>;
     changePassword(userId: string, changePasswordDto: ChangePasswordDto): Promise<void>;

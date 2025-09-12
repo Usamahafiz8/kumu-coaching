@@ -23,7 +23,7 @@ import { AuthService } from '../auth/auth.service';
 @ApiTags('Profile Management')
 @Controller('profile')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class ProfileController {
   constructor(
     private readonly profileService: ProfileService,

@@ -12,8 +12,8 @@ export declare class AuthController {
     register(registerDto: RegisterDto): Promise<AuthResponseDto>;
     login(loginDto: LoginDto): Promise<AuthResponseDto>;
     logout(req: any): Promise<ApiResponseDto>;
-    refreshToken(refreshToken: string): Promise<AuthResponseDto>;
     forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<ApiResponseDto>;
     resetPassword(resetPasswordDto: ResetPasswordDto): Promise<ApiResponseDto>;
     changePassword(req: any, changePasswordDto: ChangePasswordDto): Promise<ApiResponseDto>;
+    verifyToken(req: any): Promise<ApiResponseDto>;
 }

@@ -39,9 +39,6 @@ let AuthController = class AuthController {
         await this.authService.logout(req.user.id);
         return new api_response_dto_1.ApiResponseDto(true, 'Logout successful');
     }
-    async refreshToken(refreshToken) {
-        return this.authService.refreshToken(refreshToken);
-    }
     async forgotPassword(forgotPasswordDto) {
         await this.authService.forgotPassword(forgotPasswordDto);
         return new api_response_dto_1.ApiResponseDto(true, 'If the email exists, a password reset link has been sent');
@@ -53,6 +50,15 @@ let AuthController = class AuthController {
     async changePassword(req, changePasswordDto) {
         await this.authService.changePassword(req.user.id, changePasswordDto);
         return new api_response_dto_1.ApiResponseDto(true, 'Password changed successfully');
+    }
+    async verifyToken(req) {
+        return new api_response_dto_1.ApiResponseDto(true, 'Token is valid', {
+            id: req.user.id,
+            email: req.user.email,
+            firstName: req.user.firstName,
+            lastName: req.user.lastName,
+            role: req.user.role,
+        });
     }
 };
 exports.AuthController = AuthController;
@@ -98,7 +104,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('logout'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'User logout' }),
     (0, swagger_1.ApiResponse)({
@@ -115,24 +121,6 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
-__decorate([
-    (0, common_1.Post)('refresh-token'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    (0, swagger_1.ApiOperation)({ summary: 'Refresh JWT token' }),
-    (0, swagger_1.ApiResponse)({
-        status: 200,
-        description: 'Token refreshed successfully',
-        type: auth_response_dto_1.AuthResponseDto,
-    }),
-    (0, swagger_1.ApiResponse)({
-        status: 401,
-        description: 'Invalid refresh token',
-    }),
-    __param(0, (0, common_1.Body)('refreshToken')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "refreshToken", null);
 __decorate([
     (0, common_1.Post)('forgot-password'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
@@ -168,7 +156,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('change-password'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Change password' }),
     (0, swagger_1.ApiResponse)({
@@ -186,6 +174,41 @@ __decorate([
     __metadata("design:paramtypes", [Object, change_password_dto_1.ChangePasswordDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "changePassword", null);
+__decorate([
+    (0, common_1.Get)('verify-token'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'Verify JWT token' }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: 'Token is valid',
+        schema: {
+            type: 'object',
+            properties: {
+                success: { type: 'boolean', example: true },
+                message: { type: 'string', example: 'Token is valid' },
+                user: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string' },
+                        email: { type: 'string' },
+                        firstName: { type: 'string' },
+                        lastName: { type: 'string' },
+                        role: { type: 'string' },
+                    },
+                },
+            },
+        },
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 401,
+        description: 'Invalid or expired token',
+    }),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyToken", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Authentication'),
     (0, common_1.Controller)('auth'),

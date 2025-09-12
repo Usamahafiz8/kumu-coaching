@@ -22,7 +22,6 @@ export declare class User {
     status: UserStatus;
     emailVerified: boolean;
     emailVerificationToken: string;
-    refreshToken: string | null;
     createdAt: Date;
     updatedAt: Date;
     subscriptions: Subscription[];

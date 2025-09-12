@@ -4,7 +4,7 @@ A comprehensive NestJS-based API for a coaching platform with authentication, pr
 
 ## 🚀 Features
 
-- **Authentication System**: JWT-based authentication with refresh tokens
+- **Authentication System**: JWT-based authentication
 - **User Management**: Registration, login, password reset, profile management
 - **Subscription System**: Multiple subscription plans with purchase and cancellation
 - **Database Integration**: PostgreSQL with TypeORM
@@ -20,7 +20,6 @@ A comprehensive NestJS-based API for a coaching platform with authentication, pr
 - `POST /auth/register` - Register a new user
 - `POST /auth/login` - User login
 - `POST /auth/logout` - User logout
-- `POST /auth/refresh-token` - Refresh JWT token
 - `POST /auth/forgot-password` - Send password reset link
 - `POST /auth/reset-password` - Reset password using token
 
@@ -78,8 +77,6 @@ A comprehensive NestJS-based API for a coaching platform with authentication, pr
    # JWT Configuration
    JWT_SECRET=your-super-secret-jwt-key
    JWT_EXPIRES_IN=1h
-   JWT_REFRESH_SECRET=your-super-secret-refresh-key
-   JWT_REFRESH_EXPIRES_IN=7d
 
    # Email Configuration
    EMAIL_HOST=smtp.gmail.com
@@ -143,7 +140,6 @@ Once the application is running, you can access the Swagger documentation at:
 - `role` (Enum: user, admin, coach)
 - `status` (Enum: active, inactive, suspended)
 - `emailVerified` (Boolean)
-- `refreshToken` (String, Optional)
 - `createdAt` (Timestamp)
 - `updatedAt` (Timestamp)
 
@@ -215,8 +211,6 @@ npm run test:cov
 | `DB_NAME` | Database name | kumu_coaching |
 | `JWT_SECRET` | JWT secret key | - |
 | `JWT_EXPIRES_IN` | JWT expiration time | 1h |
-| `JWT_REFRESH_SECRET` | JWT refresh secret | - |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token expiration | 7d |
 | `EMAIL_HOST` | SMTP host | - |
 | `EMAIL_PORT` | SMTP port | 587 |
 | `EMAIL_USER` | SMTP username | - |

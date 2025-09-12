@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   HttpCode,
   HttpStatus,
@@ -65,7 +66,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User logout' })
   @ApiResponse({
@@ -82,23 +83,6 @@ export class AuthController {
     return new ApiResponseDto(true, 'Logout successful');
   }
 
-  @Post('refresh-token')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh JWT token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Token refreshed successfully',
-    type: AuthResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Invalid refresh token',
-  })
-  async refreshToken(
-    @Body('refreshToken') refreshToken: string,
-  ): Promise<AuthResponseDto> {
-    return this.authService.refreshToken(refreshToken);
-  }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -139,7 +123,7 @@ export class AuthController {
 
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Change password' })
   @ApiResponse({
@@ -157,5 +141,44 @@ export class AuthController {
   ): Promise<ApiResponseDto> {
     await this.authService.changePassword(req.user.id, changePasswordDto);
     return new ApiResponseDto(true, 'Password changed successfully');
+  }
+
+  @Get('verify-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Verify JWT token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Token is valid',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Token is valid' },
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            role: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired token',
+  })
+  async verifyToken(@Request() req): Promise<ApiResponseDto> {
+    return new ApiResponseDto(true, 'Token is valid', {
+      id: req.user.id,
+      email: req.user.email,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      role: req.user.role,
+    });
   }
 }

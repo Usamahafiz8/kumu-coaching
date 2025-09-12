@@ -68,7 +68,7 @@ export class SubscriptionsController {
 
   @Post('purchase')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Purchase/activate a subscription' })
   @ApiResponse({
     status: 201,
@@ -104,7 +104,7 @@ export class SubscriptionsController {
 
   @Get('status')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get current subscription status' })
   @ApiResponse({
     status: 200,
@@ -122,7 +122,7 @@ export class SubscriptionsController {
 
   @Get('history')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List all past subscription purchases/transactions' })
   @ApiResponse({
     status: 200,
@@ -140,7 +140,7 @@ export class SubscriptionsController {
 
   @Put('cancel')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cancel active subscription' })
   @ApiResponse({
     status: 200,

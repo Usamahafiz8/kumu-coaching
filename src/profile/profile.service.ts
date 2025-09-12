@@ -43,7 +43,7 @@ export class ProfileService {
   }
 
   private sanitizeUser(user: User): User {
-    const { password, refreshToken, ...sanitizedUser } = user;
+    const { password, ...sanitizedUser } = user;
     return sanitizedUser as User;
   }
 }

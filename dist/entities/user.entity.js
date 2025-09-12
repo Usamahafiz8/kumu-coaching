@@ -72,7 +72,6 @@ let User = class User {
     status;
     emailVerified;
     emailVerificationToken;
-    refreshToken;
     createdAt;
     updatedAt;
     subscriptions;
@@ -143,10 +142,6 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], User.prototype, "emailVerificationToken", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
-    __metadata("design:type", Object)
-], User.prototype, "refreshToken", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

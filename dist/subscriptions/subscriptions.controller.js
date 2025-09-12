@@ -90,7 +90,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('purchase'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, swagger_1.ApiOperation)({ summary: 'Purchase/activate a subscription' }),
     (0, swagger_1.ApiResponse)({
         status: 201,
@@ -123,7 +123,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('status'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, swagger_1.ApiOperation)({ summary: 'Get current subscription status' }),
     (0, swagger_1.ApiResponse)({
         status: 200,
@@ -142,7 +142,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('history'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, swagger_1.ApiOperation)({ summary: 'List all past subscription purchases/transactions' }),
     (0, swagger_1.ApiResponse)({
         status: 200,
@@ -161,7 +161,7 @@ __decorate([
 __decorate([
     (0, common_1.Put)('cancel'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     (0, swagger_1.ApiOperation)({ summary: 'Cancel active subscription' }),
     (0, swagger_1.ApiResponse)({
         status: 200,

@@ -13,7 +13,6 @@ exports.AuthResponseDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 class AuthResponseDto {
     accessToken;
-    refreshToken;
     expiresIn;
     user;
 }
@@ -25,13 +24,6 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], AuthResponseDto.prototype, "accessToken", void 0);
-__decorate([
-    (0, swagger_1.ApiProperty)({
-        description: 'JWT refresh token',
-        example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    }),
-    __metadata("design:type", String)
-], AuthResponseDto.prototype, "refreshToken", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
         description: 'Token expiration time in seconds',

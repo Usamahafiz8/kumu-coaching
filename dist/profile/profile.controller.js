@@ -119,7 +119,7 @@ exports.ProfileController = ProfileController = __decorate([
     (0, swagger_1.ApiTags)('Profile Management'),
     (0, common_1.Controller)('profile'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
     __metadata("design:paramtypes", [profile_service_1.ProfileService,
         auth_service_1.AuthService])
 ], ProfileController);
