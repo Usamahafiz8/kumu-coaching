@@ -69,7 +69,7 @@ export class User {
   @Column({ nullable: true })
   emailVerificationToken: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   refreshToken: string | null;
 
   @CreateDateColumn()

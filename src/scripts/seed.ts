@@ -19,7 +19,22 @@ const AppDataSource = new DataSource({
   entities: [User, SubscriptionPlan, Subscription, PasswordReset],
   synchronize: true,
   logging: false,
+  // Connection timeout and pool configuration
+  connectTimeoutMS: 30000, // 30 seconds connection timeout
+  extra: {
+    // Connection pool settings
+    max: 10, // Maximum number of connections in the pool
+    min: 2,  // Minimum number of connections in the pool
+    idle: 10000, // Close connections after 10 seconds of inactivity
+    acquire: 30000, // Maximum time to wait for a connection
+    evict: 1000, // Check for idle connections every 1 second
+    // PostgreSQL specific settings
+    statement_timeout: 30000, // 30 seconds statement timeout
+    query_timeout: 30000, // 30 seconds query timeout
+  },
 });
+
+
 
 async function main() {
   try {
@@ -29,6 +44,7 @@ async function main() {
 
     await runSeeds(AppDataSource);
   } catch (error) {
+    console.log(process.env.DB_USERNAME, process.env.DB_PASSWORD, process.env.DB_NAME, process.env.DB_HOST, process.env.DB_PORT);
     console.error('❌ Error during seeding:', error);
     process.exit(1);
   } finally {

@@ -32,7 +32,7 @@ async function bootstrap() {
     }, 'JWT-auth')
         .build();
     const document = swagger_1.SwaggerModule.createDocument(app, config);
-    swagger_1.SwaggerModule.setup('api/docs', app, document, {
+    swagger_1.SwaggerModule.setup('update all the ', app, document, {
         swaggerOptions: {
             persistAuthorization: true,
         },

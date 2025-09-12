@@ -48,7 +48,7 @@ export class Subscription {
   @Column({ nullable: true })
   cancelledAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   cancellationReason: string | null;
 
   @Column({ nullable: true })

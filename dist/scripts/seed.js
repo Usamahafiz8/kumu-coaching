@@ -18,6 +18,16 @@ const AppDataSource = new typeorm_1.DataSource({
     entities: [user_entity_1.User, subscription_plan_entity_1.SubscriptionPlan, subscription_entity_1.Subscription, password_reset_entity_1.PasswordReset],
     synchronize: true,
     logging: false,
+    connectTimeoutMS: 30000,
+    extra: {
+        max: 10,
+        min: 2,
+        idle: 10000,
+        acquire: 30000,
+        evict: 1000,
+        statement_timeout: 30000,
+        query_timeout: 30000,
+    },
 });
 async function main() {
     try {
@@ -27,6 +37,7 @@ async function main() {
         await (0, seeds_1.runSeeds)(AppDataSource);
     }
     catch (error) {
+        console.log(process.env.DB_USERNAME, process.env.DB_PASSWORD, process.env.DB_NAME, process.env.DB_HOST, process.env.DB_PORT);
         console.error('❌ Error during seeding:', error);
         process.exit(1);
     }
