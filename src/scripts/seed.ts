@@ -42,7 +42,13 @@ async function main() {
     await AppDataSource.initialize();
     console.log('✅ Database connection established');
 
-    await runSeeds(AppDataSource);
+    // Check for force flag in command line arguments
+    const force = process.argv.includes('--force');
+    if (force) {
+      console.log('⚠️  Force flag detected. Existing subscription plans will be cleared.');
+    }
+
+    await runSeeds(AppDataSource, force);
   } catch (error) {
     console.log(process.env.DB_USERNAME, process.env.DB_PASSWORD, process.env.DB_NAME, process.env.DB_HOST, process.env.DB_PORT);
     console.error('❌ Error during seeding:', error);

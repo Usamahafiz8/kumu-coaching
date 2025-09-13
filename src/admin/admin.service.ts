@@ -2,12 +2,15 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../entities/user.entity';
 import { Subscription, SubscriptionStatus } from '../entities/subscription.entity';
-import { SubscriptionPlan } from '../entities/subscription-plan.entity';
+import { SubscriptionPlan, PlanStatus } from '../entities/subscription-plan.entity';
+import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
+import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
 
 @Injectable()
 export class AdminService {
@@ -218,6 +221,180 @@ export class AdminService {
     }
 
     await this.userRepository.remove(user);
+  }
+
+  // Subscription Plan Management Methods
+  async getAllSubscriptionPlans(page: number = 1, limit: number = 10): Promise<{
+    plans: SubscriptionPlan[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const [plans, total] = await this.subscriptionPlanRepository.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    // Add subscription count for each plan
+    const plansWithCounts = await Promise.all(
+      plans.map(async (plan) => {
+        const subscriptionCount = await this.subscriptionRepository.count({
+          where: { planId: plan.id, status: SubscriptionStatus.ACTIVE },
+        });
+        return { ...plan, subscriptionCount };
+      })
+    );
+
+    return {
+      plans: plansWithCounts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getSubscriptionPlanById(id: string): Promise<SubscriptionPlan> {
+    const plan = await this.subscriptionPlanRepository.findOne({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    return plan;
+  }
+
+  async createSubscriptionPlan(createPlanDto: CreateSubscriptionPlanDto): Promise<SubscriptionPlan> {
+    // Check if a plan with the same name already exists
+    const existingPlan = await this.subscriptionPlanRepository.findOne({
+      where: { name: createPlanDto.name },
+    });
+
+    if (existingPlan) {
+      throw new BadRequestException('A subscription plan with this name already exists');
+    }
+
+    const plan = this.subscriptionPlanRepository.create({
+      ...createPlanDto,
+      status: createPlanDto.status || PlanStatus.ACTIVE,
+      isActive: createPlanDto.isActive !== undefined ? createPlanDto.isActive : true,
+    });
+
+    return this.subscriptionPlanRepository.save(plan);
+  }
+
+  async updateSubscriptionPlan(id: string, updatePlanDto: UpdateSubscriptionPlanDto): Promise<SubscriptionPlan> {
+    const plan = await this.subscriptionPlanRepository.findOne({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    // Check if updating name and if it conflicts with existing plan
+    if (updatePlanDto.name && updatePlanDto.name !== plan.name) {
+      const existingPlan = await this.subscriptionPlanRepository.findOne({
+        where: { name: updatePlanDto.name },
+      });
+
+      if (existingPlan) {
+        throw new BadRequestException('A subscription plan with this name already exists');
+      }
+    }
+
+    // Don't allow deactivating a plan that has active subscriptions
+    if (updatePlanDto.isActive === false || updatePlanDto.status === PlanStatus.INACTIVE) {
+      const activeSubscriptions = await this.subscriptionRepository.count({
+        where: { planId: id, status: SubscriptionStatus.ACTIVE },
+      });
+
+      if (activeSubscriptions > 0) {
+        throw new BadRequestException('Cannot deactivate a plan that has active subscriptions');
+      }
+    }
+
+    Object.assign(plan, updatePlanDto);
+    return this.subscriptionPlanRepository.save(plan);
+  }
+
+  async deleteSubscriptionPlan(id: string): Promise<void> {
+    const plan = await this.subscriptionPlanRepository.findOne({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    // Check if plan has any subscriptions
+    const subscriptionCount = await this.subscriptionRepository.count({
+      where: { planId: id },
+    });
+
+    if (subscriptionCount > 0) {
+      throw new BadRequestException('Cannot delete a subscription plan that has associated subscriptions');
+    }
+
+    await this.subscriptionPlanRepository.remove(plan);
+  }
+
+  async getSubscriptionPlanStats(): Promise<{
+    totalPlans: number;
+    activePlans: number;
+    inactivePlans: number;
+    archivedPlans: number;
+    plansWithSubscriptions: number;
+    mostPopularPlan: {
+      planName: string;
+      subscriptionCount: number;
+    } | null;
+  }> {
+    const [
+      totalPlans,
+      activePlans,
+      inactivePlans,
+      archivedPlans,
+    ] = await Promise.all([
+      this.subscriptionPlanRepository.count(),
+      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.ACTIVE } }),
+      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.INACTIVE } }),
+      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.ARCHIVED } }),
+    ]);
+
+    // Get plans with subscriptions
+    const plansWithSubscriptions = await this.subscriptionPlanRepository
+      .createQueryBuilder('plan')
+      .leftJoin('plan.subscriptions', 'subscription')
+      .where('subscription.id IS NOT NULL')
+      .getCount();
+
+    // Get most popular plan
+    const mostPopularPlanResult = await this.subscriptionRepository
+      .createQueryBuilder('subscription')
+      .leftJoin('subscription.plan', 'plan')
+      .select('plan.name', 'planName')
+      .addSelect('COUNT(subscription.id)', 'subscriptionCount')
+      .groupBy('plan.id, plan.name')
+      .orderBy('COUNT(subscription.id)', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    return {
+      totalPlans,
+      activePlans,
+      inactivePlans,
+      archivedPlans,
+      plansWithSubscriptions,
+      mostPopularPlan: mostPopularPlanResult ? {
+        planName: mostPopularPlanResult.planName,
+        subscriptionCount: parseInt(mostPopularPlanResult.subscriptionCount),
+      } : null,
+    };
   }
 
   private validateAdminAccess(user: User): void {

@@ -1,8 +1,21 @@
 import { DataSource } from 'typeorm';
 import { SubscriptionPlan, PlanType } from '../../entities/subscription-plan.entity';
 
-export async function seedSubscriptionPlans(dataSource: DataSource) {
+export async function seedSubscriptionPlans(dataSource: DataSource, force: boolean = false) {
   const subscriptionPlanRepository = dataSource.getRepository(SubscriptionPlan);
+
+  // Check if plans already exist
+  const existingPlansCount = await subscriptionPlanRepository.count();
+  if (existingPlansCount > 0 && !force) {
+    console.log('Subscription plans already exist. Skipping seed. Use force=true to override.');
+    return;
+  }
+
+  // If force is true, clear existing plans
+  if (force && existingPlansCount > 0) {
+    console.log('Clearing existing subscription plans...');
+    await subscriptionPlanRepository.clear();
+  }
 
   const plans = [
     {
@@ -64,16 +77,10 @@ export async function seedSubscriptionPlans(dataSource: DataSource) {
   ];
 
   for (const planData of plans) {
-    const existingPlan = await subscriptionPlanRepository.findOne({
-      where: { name: planData.name },
-    });
-
-    if (!existingPlan) {
-      const plan = subscriptionPlanRepository.create(planData);
-      await subscriptionPlanRepository.save(plan);
-      console.log(`✅ Created subscription plan: ${planData.name}`);
-    } else {
-      console.log(`⏭️  Subscription plan already exists: ${planData.name}`);
-    }
+    const plan = subscriptionPlanRepository.create(planData);
+    await subscriptionPlanRepository.save(plan);
+    console.log(`✅ Created subscription plan: ${planData.name}`);
   }
+
+  console.log(`✅ Subscription plans seeding completed. Created ${plans.length} plans.`);
 }
