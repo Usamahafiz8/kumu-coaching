@@ -11,6 +11,7 @@ import { Subscription, SubscriptionStatus } from '../entities/subscription.entit
 import { SubscriptionPlan, PlanStatus } from '../entities/subscription-plan.entity';
 import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
+import { StripeService } from '../stripe/stripe.service';
 
 @Injectable()
 export class AdminService {
@@ -21,6 +22,7 @@ export class AdminService {
     private subscriptionRepository: Repository<Subscription>,
     @InjectRepository(SubscriptionPlan)
     private subscriptionPlanRepository: Repository<SubscriptionPlan>,
+    private stripeService: StripeService,
   ) {}
 
   async getAllUsers(page: number = 1, limit: number = 10): Promise<{
@@ -284,7 +286,19 @@ export class AdminService {
       isActive: createPlanDto.isActive !== undefined ? createPlanDto.isActive : true,
     });
 
-    return this.subscriptionPlanRepository.save(plan);
+    const savedPlan = await this.subscriptionPlanRepository.save(plan);
+
+    // Create Stripe product and price
+    try {
+      const stripeData = await this.stripeService.createProduct(savedPlan);
+      savedPlan.stripeProductId = stripeData.productId;
+      savedPlan.stripePriceId = stripeData.priceId;
+      return this.subscriptionPlanRepository.save(savedPlan);
+    } catch (error) {
+      // If Stripe creation fails, delete the plan
+      await this.subscriptionPlanRepository.remove(savedPlan);
+      throw new BadRequestException('Failed to create Stripe product for the plan');
+    }
   }
 
   async updateSubscriptionPlan(id: string, updatePlanDto: UpdateSubscriptionPlanDto): Promise<SubscriptionPlan> {
@@ -319,7 +333,21 @@ export class AdminService {
     }
 
     Object.assign(plan, updatePlanDto);
-    return this.subscriptionPlanRepository.save(plan);
+    const updatedPlan = await this.subscriptionPlanRepository.save(plan);
+
+    // Update Stripe product if plan details changed
+    if (updatePlanDto.name || updatePlanDto.description || updatePlanDto.price) {
+      try {
+        const stripeData = await this.stripeService.updateProduct(updatedPlan);
+        updatedPlan.stripeProductId = stripeData.productId;
+        updatedPlan.stripePriceId = stripeData.priceId;
+        return this.subscriptionPlanRepository.save(updatedPlan);
+      } catch (error) {
+        throw new BadRequestException('Failed to update Stripe product for the plan');
+      }
+    }
+
+    return updatedPlan;
   }
 
   async deleteSubscriptionPlan(id: string): Promise<void> {
@@ -338,6 +366,16 @@ export class AdminService {
 
     if (subscriptionCount > 0) {
       throw new BadRequestException('Cannot delete a subscription plan that has associated subscriptions');
+    }
+
+    // Delete Stripe product if it exists
+    if (plan.stripeProductId) {
+      try {
+        await this.stripeService.deleteProduct(plan.stripeProductId);
+      } catch (error) {
+        // Log error but don't fail the deletion
+        console.error('Failed to delete Stripe product:', error);
+      }
     }
 
     await this.subscriptionPlanRepository.remove(plan);

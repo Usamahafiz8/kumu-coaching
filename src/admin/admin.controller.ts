@@ -26,13 +26,17 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
 import { SubscriptionPlanResponseDto } from './dto/subscription-plan-response.dto';
+import { StripeService } from '../stripe/stripe.service';
 
 @ApiTags('Admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT-auth')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly stripeService: StripeService,
+  ) {}
 
   @Get('users')
   @ApiOperation({ summary: 'Get all users (Admin only)' })
@@ -248,6 +252,24 @@ export class AdminController {
     return this.adminService.getAllSubscriptionPlans(page, limit);
   }
 
+  @Get('subscription-plans/stats')
+  @ApiOperation({ summary: 'Get subscription plan statistics (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Subscription plan statistics retrieved successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin access required',
+  })
+  async getSubscriptionPlanStats(@Request() req) {
+    if (req.user.role !== UserRole.ADMIN) {
+      throw new Error('Access denied. Admin role required.');
+    }
+
+    return this.adminService.getSubscriptionPlanStats();
+  }
+
   @Get('subscription-plans/:id')
   @ApiOperation({ summary: 'Get subscription plan by ID (Admin only)' })
   @ApiResponse({
@@ -358,21 +380,61 @@ export class AdminController {
     return new ApiResponseDto(true, 'Subscription plan deleted successfully');
   }
 
-  @Get('subscription-plans/stats')
-  @ApiOperation({ summary: 'Get subscription plan statistics (Admin only)' })
+  // Stripe Management Endpoints
+  @Get('stripe/config')
+  @ApiOperation({ summary: 'Get Stripe configuration (Admin only)' })
   @ApiResponse({
     status: 200,
-    description: 'Subscription plan statistics retrieved successfully',
+    description: 'Stripe configuration retrieved successfully',
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Admin access required',
   })
-  async getSubscriptionPlanStats(@Request() req) {
+  async getStripeConfig(@Request() req) {
     if (req.user.role !== UserRole.ADMIN) {
       throw new Error('Access denied. Admin role required.');
     }
 
-    return this.adminService.getSubscriptionPlanStats();
+    const publishableKey = await this.stripeService.getPublishableKey();
+    const mode = await this.stripeService.getMode();
+    
+    return new ApiResponseDto(true, 'Stripe configuration retrieved', {
+      publishableKey,
+      mode,
+      currency: 'usd', // You can make this configurable
+    });
+  }
+
+  @Post('stripe/test-connection')
+  @ApiOperation({ summary: 'Test Stripe connection (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stripe connection test successful',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Stripe connection test failed',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin access required',
+  })
+  async testStripeConnection(@Request() req) {
+    if (req.user.role !== UserRole.ADMIN) {
+      throw new Error('Access denied. Admin role required.');
+    }
+
+    try {
+      // Test connection by retrieving account info
+      const account = await this.stripeService.getAccount();
+      return new ApiResponseDto(true, 'Stripe connection successful', {
+        accountId: account.id,
+        country: account.country,
+        currency: account.default_currency,
+      });
+    } catch (error) {
+      throw new Error('Stripe connection test failed: ' + error.message);
+    }
   }
 }
