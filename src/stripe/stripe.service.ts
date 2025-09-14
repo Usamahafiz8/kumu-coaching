@@ -1,39 +1,67 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService as NestConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { SubscriptionPlan, PlanType } from '../entities/subscription-plan.entity';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
   private stripe: Stripe;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private nestConfigService: NestConfigService,
+    private configService: ConfigService,
+  ) {
     // Initialize Stripe only when needed
     this.initializeStripe();
   }
 
-  private initializeStripe(): void {
-    const secretKey = this.configService.get<string>('stripe.secretKey');
-    if (secretKey) {
-      this.stripe = new Stripe(secretKey, {
-        apiVersion: '2025-08-27.basil',
-      });
+  private async initializeStripe(): Promise<void> {
+    try {
+      const stripeConfig = await this.configService.getStripeConfig();
+      if (stripeConfig.secretKey) {
+        this.stripe = new Stripe(stripeConfig.secretKey, {
+          apiVersion: '2025-08-27.basil',
+        });
+      }
+    } catch (error) {
+      this.logger.warn('Failed to initialize Stripe from database config, falling back to environment variables');
+      // Fallback to environment variables
+      const secretKey = this.nestConfigService.get<string>('stripe.secretKey');
+      if (secretKey) {
+        this.stripe = new Stripe(secretKey, {
+          apiVersion: '2025-08-27.basil',
+        });
+      }
     }
   }
 
-  private ensureStripeInitialized(): void {
+  private async ensureStripeInitialized(): Promise<void> {
     if (!this.stripe) {
-      const secretKey = this.configService.get<string>('stripe.secretKey');
-      if (!secretKey) {
-        throw new Error('Stripe secret key is not configured');
+      try {
+        const stripeConfig = await this.configService.getStripeConfig();
+        if (!stripeConfig.secretKey) {
+          throw new Error('Stripe secret key is not configured');
+        }
+        this.stripe = new Stripe(stripeConfig.secretKey, {
+          apiVersion: '2025-08-27.basil',
+        });
+      } catch (error) {
+        // Fallback to environment variables
+        const secretKey = this.nestConfigService.get<string>('stripe.secretKey');
+        if (!secretKey) {
+          throw new Error('Stripe secret key is not configured');
+        }
+        this.stripe = new Stripe(secretKey, {
+          apiVersion: '2025-08-27.basil',
+        });
       }
-      this.initializeStripe();
     }
   }
 
   async createProduct(plan: SubscriptionPlan): Promise<{ productId: string; priceId: string }> {
-    this.ensureStripeInitialized();
+    await this.ensureStripeInitialized();
     try {
       // Create Stripe product
       const product = await this.stripe.products.create({
@@ -50,7 +78,7 @@ export class StripeService {
       const price = await this.stripe.prices.create({
         product: product.id,
         unit_amount: Math.round(plan.price * 100), // Convert to cents
-        currency: this.configService.get<string>('stripe.currency') || 'usd',
+        currency: (await this.configService.getStripeConfig()).currency || 'usd',
         recurring: plan.type !== PlanType.LIFETIME ? {
           interval: this.getStripeInterval(plan.type),
           interval_count: this.getIntervalCount(plan.type),
@@ -93,7 +121,7 @@ export class StripeService {
       const price = await this.stripe.prices.create({
         product: plan.stripeProductId,
         unit_amount: Math.round(plan.price * 100),
-        currency: this.configService.get<string>('stripe.currency') || 'usd',
+        currency: (await this.configService.getStripeConfig()).currency || 'usd',
         recurring: plan.type !== PlanType.LIFETIME ? {
           interval: this.getStripeInterval(plan.type),
           interval_count: this.getIntervalCount(plan.type),
@@ -229,7 +257,7 @@ export class StripeService {
 
   async constructWebhookEvent(payload: string | Buffer, signature: string): Promise<Stripe.Event> {
     this.ensureStripeInitialized();
-    const webhookSecret = this.configService.get<string>('stripe.webhookSecret');
+    const webhookSecret = (await this.configService.getStripeConfig()).webhookSecret;
     if (!webhookSecret) {
       throw new Error('Stripe webhook secret is not configured');
     }
@@ -243,11 +271,13 @@ export class StripeService {
   }
 
   async getPublishableKey(): Promise<string> {
-    return this.configService.get<string>('stripe.publishableKey') || '';
+    const config = await this.configService.getStripeConfig();
+    return config.publishableKey || '';
   }
 
   async getMode(): Promise<string> {
-    return this.configService.get<string>('stripe.mode') || 'test';
+    const config = await this.configService.getStripeConfig();
+    return config.mode || 'test';
   }
 
   async getAccount(): Promise<Stripe.Account> {
@@ -256,6 +286,45 @@ export class StripeService {
       return await this.stripe.accounts.retrieve();
     } catch (error) {
       this.logger.error('Failed to retrieve Stripe account:', error);
+      throw error;
+    }
+  }
+
+  async createPayout(accountId: string, amount: number, description?: string): Promise<Stripe.Payout> {
+    this.ensureStripeInitialized();
+    
+    // Convert amount to cents
+    const amountInCents = Math.round(amount * 100);
+    
+    try {
+      return await this.stripe.payouts.create({
+        amount: amountInCents,
+        currency: (await this.configService.getStripeConfig()).currency || 'usd',
+        destination: accountId,
+        description: description || 'Influencer commission payout',
+      });
+    } catch (error) {
+      this.logger.error(`Failed to create payout for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  async getPayout(payoutId: string): Promise<Stripe.Payout> {
+    this.ensureStripeInitialized();
+    try {
+      return await this.stripe.payouts.retrieve(payoutId);
+    } catch (error) {
+      this.logger.error(`Failed to retrieve payout ${payoutId}:`, error);
+      throw error;
+    }
+  }
+
+  async listPayouts(limit: number = 10): Promise<Stripe.ApiList<Stripe.Payout>> {
+    this.ensureStripeInitialized();
+    try {
+      return await this.stripe.payouts.list({ limit });
+    } catch (error) {
+      this.logger.error('Failed to list payouts:', error);
       throw error;
     }
   }

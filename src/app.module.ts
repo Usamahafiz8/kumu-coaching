@@ -9,12 +9,20 @@ import { AuthModule } from './auth/auth.module';
 import { ProfileModule } from './profile/profile.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AdminModule } from './admin/admin.module';
+import { InfluencerModule } from './influencer/influencer.module';
+import { PromoCodesModule } from './promo-codes/promo-codes.module';
 import { User } from './entities/user.entity';
 import { SubscriptionPlan } from './entities/subscription-plan.entity';
 import { Subscription } from './entities/subscription.entity';
 import { PasswordReset } from './entities/password-reset.entity';
+import { Influencer } from './entities/influencer.entity';
+import { PromoCode } from './entities/promo-code.entity';
+import { Commission } from './entities/commission.entity';
+import { AppConfig } from './entities/app-config.entity';
+import { EmailConfig } from './entities/email-config.entity';
+import { EmailTemplate } from './entities/email-template.entity';
 import { HttpExceptionFilter, AllExceptionsFilter } from './common/filters/http-exception.filter';
-import databaseConfig from './config/database.config';
+import databaseConfig from './config/database-sqlite.config';
 import jwtConfig from './config/jwt.config';
 import stripeConfig from './config/stripe.config';
 
@@ -30,11 +38,13 @@ import stripeConfig from './config/stripe.config';
       useFactory: (configService: ConfigService) => configService.get('database')!,
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, SubscriptionPlan, Subscription, PasswordReset]),
+    TypeOrmModule.forFeature([User, SubscriptionPlan, Subscription, PasswordReset, Influencer, PromoCode, Commission, AppConfig, EmailConfig, EmailTemplate]),
     AuthModule,
     ProfileModule,
     SubscriptionsModule,
     AdminModule,
+    InfluencerModule,
+    PromoCodesModule,
   ],
   controllers: [AppController],
   providers: [

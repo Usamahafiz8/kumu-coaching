@@ -11,6 +11,8 @@ import { SubscriptionPlan, PlanStatus } from '../entities/subscription-plan.enti
 import { Subscription, SubscriptionStatus } from '../entities/subscription.entity';
 import { PurchaseSubscriptionDto } from './dto/purchase-subscription.dto';
 import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
+import { InfluencerService } from '../influencer/influencer.service';
+import { Inject, forwardRef } from '@nestjs/common';
 
 @Injectable()
 export class SubscriptionsService {
@@ -21,6 +23,8 @@ export class SubscriptionsService {
     private subscriptionPlanRepository: Repository<SubscriptionPlan>,
     @InjectRepository(Subscription)
     private subscriptionRepository: Repository<Subscription>,
+    @Inject(forwardRef(() => InfluencerService))
+    private influencerService: InfluencerService,
   ) {}
 
   async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
@@ -46,7 +50,7 @@ export class SubscriptionsService {
     userId: string,
     purchaseDto: PurchaseSubscriptionDto,
   ): Promise<Subscription> {
-    const { planId, metadata } = purchaseDto;
+    const { planId, promoCode, metadata } = purchaseDto;
 
     // Check if plan exists
     const plan = await this.getSubscriptionPlanById(planId);
@@ -62,18 +66,53 @@ export class SubscriptionsService {
     const endDate = new Date();
     endDate.setMonth(endDate.getMonth() + plan.durationInMonths);
 
+    // Handle promo code if provided
+    let finalAmount = plan.price;
+    let promoCodeId: string | undefined;
+
+    if (promoCode) {
+      try {
+        const validation = await this.influencerService.validatePromoCode({
+          code: promoCode,
+          orderAmount: plan.price,
+        });
+
+        if (validation.isValid) {
+          finalAmount = validation.finalAmount;
+          promoCodeId = validation.promoCode?.id;
+        } else {
+          throw new BadRequestException(validation.error || 'Invalid promo code');
+        }
+      } catch (error) {
+        throw new BadRequestException(`Promo code validation failed: ${error.message}`);
+      }
+    }
+
     // Create subscription
     const subscription = this.subscriptionRepository.create({
       userId,
       planId,
-      amount: plan.price,
+      amount: finalAmount,
       startDate,
       endDate,
       status: SubscriptionStatus.ACTIVE,
+      promoCodeId,
       metadata,
     });
 
-    return this.subscriptionRepository.save(subscription);
+    const savedSubscription = await this.subscriptionRepository.save(subscription);
+
+    // Apply promo code and create commission if valid
+    if (promoCode && promoCodeId) {
+      try {
+        await this.influencerService.applyPromoCode(promoCode, savedSubscription.id);
+      } catch (error) {
+        // Log error but don't fail the subscription creation
+        console.error('Failed to apply promo code:', error);
+      }
+    }
+
+    return savedSubscription;
   }
 
   async getSubscriptionStatus(userId: string): Promise<{

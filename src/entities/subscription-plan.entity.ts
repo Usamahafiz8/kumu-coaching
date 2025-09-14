@@ -36,8 +36,7 @@ export class SubscriptionPlan {
   price: number;
 
   @Column({
-    type: 'enum',
-    enum: PlanType,
+    type: 'varchar',
   })
   type: PlanType;
 
@@ -48,8 +47,7 @@ export class SubscriptionPlan {
   features: string[];
 
   @Column({
-    type: 'enum',
-    enum: PlanStatus,
+    type: 'varchar',
     default: PlanStatus.ACTIVE,
   })
   status: PlanStatus;

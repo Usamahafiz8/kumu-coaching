@@ -5,10 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
+import { PromoCode } from './promo-code.entity';
+import { Commission } from './commission.entity';
 
 export enum SubscriptionStatus {
   ACTIVE = 'active',
@@ -30,8 +33,7 @@ export class Subscription {
   planId: string;
 
   @Column({
-    type: 'enum',
-    enum: SubscriptionStatus,
+    type: 'varchar',
     default: SubscriptionStatus.PENDING,
   })
   status: SubscriptionStatus;
@@ -54,6 +56,9 @@ export class Subscription {
   @Column({ nullable: true })
   stripeSubscriptionId: string;
 
+  @Column('uuid', { nullable: true })
+  promoCodeId: string;
+
   @Column({ nullable: true })
   stripePaymentIntentId: string;
 
@@ -69,6 +74,13 @@ export class Subscription {
   @ManyToOne(() => User, (user) => user.subscriptions)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @ManyToOne(() => PromoCode, (promoCode) => promoCode.subscriptions)
+  @JoinColumn({ name: 'promoCodeId' })
+  promoCode: PromoCode;
+
+  @OneToOne(() => Commission, (commission) => commission.subscription)
+  commission: Commission;
 
   @ManyToOne(() => SubscriptionPlan, (plan) => plan.subscriptions)
   @JoinColumn({ name: 'planId' })

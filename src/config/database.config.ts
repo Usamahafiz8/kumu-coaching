@@ -13,7 +13,7 @@ export default registerAs(
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: process.env.NODE_ENV === 'development',
     logging: process.env.NODE_ENV === 'development',
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: { rejectUnauthorized: false } ,
     // Connection timeout and pool configuration
     connectTimeoutMS: 30000, // 30 seconds connection timeout
     extra: {

@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
@@ -12,6 +13,7 @@ import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
 import { Subscription } from './subscription.entity';
 import { PasswordReset } from './password-reset.entity';
+import { Influencer } from './influencer.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -50,15 +52,13 @@ export class User {
   avatar: string;
 
   @Column({
-    type: 'enum',
-    enum: UserRole,
+    type: 'varchar',
     default: UserRole.USER,
   })
   role: UserRole;
 
   @Column({
-    type: 'enum',
-    enum: UserStatus,
+    type: 'varchar',
     default: UserStatus.ACTIVE,
   })
   status: UserStatus;
@@ -78,6 +78,9 @@ export class User {
 
   @OneToMany(() => Subscription, (subscription) => subscription.user)
   subscriptions: Subscription[];
+
+  @OneToOne(() => Influencer, (influencer) => influencer.user)
+  influencer: Influencer;
 
   @OneToMany(() => PasswordReset, (passwordReset) => passwordReset.user)
   passwordResets: PasswordReset[];

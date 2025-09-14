@@ -5,33 +5,22 @@ import { User } from '../entities/user.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
+import { Influencer } from '../entities/influencer.entity';
+import { PromoCode } from '../entities/promo-code.entity';
+import { Commission } from '../entities/commission.entity';
+import { AppConfig } from '../entities/app-config.entity';
+import { EmailConfig } from '../entities/email-config.entity';
+import { EmailTemplate } from '../entities/email-template.entity';
 
 // Load environment variables
 config();
 
 const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  username: process.env.DB_USERNAME || 'cybillnerd',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'kumu_coaching',
-  entities: [User, SubscriptionPlan, Subscription, PasswordReset],
+  type: 'sqlite',
+  database: 'kumu_coaching.db',
+  entities: [User, SubscriptionPlan, Subscription, PasswordReset, Influencer, PromoCode, Commission, AppConfig, EmailConfig, EmailTemplate],
   synchronize: true,
   logging: false,
-  // Connection timeout and pool configuration
-  connectTimeoutMS: 30000, // 30 seconds connection timeout
-  extra: {
-    // Connection pool settings
-    max: 10, // Maximum number of connections in the pool
-    min: 2,  // Minimum number of connections in the pool
-    idle: 10000, // Close connections after 10 seconds of inactivity
-    acquire: 30000, // Maximum time to wait for a connection
-    evict: 1000, // Check for idle connections every 1 second
-    // PostgreSQL specific settings
-    statement_timeout: 30000, // 30 seconds statement timeout
-    query_timeout: 30000, // 30 seconds query timeout
-  },
 });
 
 

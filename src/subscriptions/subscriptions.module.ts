@@ -6,11 +6,14 @@ import { User } from '../entities/user.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { AuthModule } from '../auth/auth.module';
+import { InfluencerModule } from '../influencer/influencer.module';
+import { forwardRef } from '@nestjs/common';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, SubscriptionPlan, Subscription]),
     AuthModule,
+    forwardRef(() => InfluencerModule),
   ],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],

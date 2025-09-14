@@ -29,7 +29,9 @@ import { ApiResponseDto, PaginatedResponseDto } from '../common/dto/api-response
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
 export class SubscriptionsController {
-  constructor(private readonly subscriptionsService: SubscriptionsService) {}
+  constructor(
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   @Get('plans')
   @ApiOperation({ summary: 'List all available subscription plans' })

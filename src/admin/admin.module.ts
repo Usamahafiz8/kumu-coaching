@@ -7,12 +7,18 @@ import { Subscription } from '../entities/subscription.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { AuthModule } from '../auth/auth.module';
 import { StripeModule } from '../stripe/stripe.module';
+import { InfluencerModule } from '../influencer/influencer.module';
+import { ConfigModule } from '../config/config.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Subscription, SubscriptionPlan]),
     AuthModule,
     StripeModule,
+    InfluencerModule,
+    ConfigModule,
+    EmailModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
