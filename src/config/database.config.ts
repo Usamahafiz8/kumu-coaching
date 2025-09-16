@@ -5,7 +5,7 @@ export default registerAs(
   'database',
   (): TypeOrmModuleOptions => ({
     type: 'postgres',
-    host: 'kumu-db.chgki6kqcigb.eu-north-1.rds.amazonaws.com',
+    host: 'database-3.chgki6kqcigb.eu-north-1.rds.amazonaws.com',
     port: 5432,
     username: 'postgres',
     password: '90E9hC6LEWhVcivMerwh',
