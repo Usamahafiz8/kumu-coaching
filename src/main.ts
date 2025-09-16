@@ -27,6 +27,9 @@ async function bootstrap() {
   );
 
   // Swagger documentation
+  const port = process.env.PORT || 3000;
+  const baseUrl = process.env.API_BASE_URL || `http://localhost:${port}`;
+  
   const config = new DocumentBuilder()
     .setTitle('Kumu Coaching API')
     .setDescription('API documentation for Kumu Coaching platform')
@@ -42,7 +45,7 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addServer('http://localhost:3000', 'Development server')
+    .addServer(baseUrl, 'API Server')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -70,11 +73,10 @@ async function bootstrap() {
     `,
   });
 
-  const port = process.env.PORT || 3000;
   await app.listen(port);
   
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  console.log(`🚀 Application is running on: ${baseUrl}`);
+  console.log(`📚 API Documentation: ${baseUrl}/api/docs`);
 }
 
 bootstrap();

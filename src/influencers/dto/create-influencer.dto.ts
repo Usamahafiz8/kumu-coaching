@@ -115,3 +115,4 @@ export class CreateInfluencerDto {
   @IsOptional()
   notes?: string;
 }
+

@@ -97,3 +97,4 @@ export class UpdateInfluencerDto {
   @IsOptional()
   notes?: string;
 }
+

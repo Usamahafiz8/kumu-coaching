@@ -86,3 +86,4 @@ export class Commission {
     return this.status === CommissionStatus.APPROVED;
   }
 }
+
