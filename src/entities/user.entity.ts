@@ -11,14 +11,14 @@ import {
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
-import { Subscription } from './subscription.entity';
 import { PasswordReset } from './password-reset.entity';
-import { Influencer } from './influencer.entity';
+import { VerificationCode } from './verification-code.entity';
+import { Subscription } from './subscription.entity';
 
 export enum UserRole {
-  USER = 'user',
   ADMIN = 'admin',
-  COACH = 'coach',
+  PLAYER = 'player',
+  INFLUENCER = 'influencer',
 }
 
 export enum UserStatus {
@@ -53,7 +53,7 @@ export class User {
 
   @Column({
     type: 'varchar',
-    default: UserRole.USER,
+    default: UserRole.PLAYER,
   })
   role: UserRole;
 
@@ -76,14 +76,15 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => Subscription, (subscription) => subscription.user)
-  subscriptions: Subscription[];
-
-  @OneToOne(() => Influencer, (influencer) => influencer.user)
-  influencer: Influencer;
 
   @OneToMany(() => PasswordReset, (passwordReset) => passwordReset.user)
   passwordResets: PasswordReset[];
+
+  @OneToMany(() => VerificationCode, (verificationCode) => verificationCode.user)
+  verificationCodes: VerificationCode[];
+
+  @OneToMany(() => Subscription, (subscription) => subscription.user)
+  subscriptions: Subscription[];
 
   @BeforeInsert()
   @BeforeUpdate()

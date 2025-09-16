@@ -13,6 +13,7 @@ import { PromoCode } from './promo-code.entity';
 import { Commission } from './commission.entity';
 
 export enum InfluencerStatus {
+  PENDING = 'pending',
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   SUSPENDED = 'suspended',
@@ -24,40 +25,56 @@ export class Influencer {
   id: string;
 
   @Column('uuid', { unique: true })
-  userId: string;
+  userId: string; // Reference to User entity
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  socialMediaHandle: string; // Instagram, TikTok, YouTube handle
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  platform: string; // Instagram, TikTok, YouTube, etc.
+
+  @Column({ type: 'int', nullable: true })
+  followerCount: number;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 10.0 })
-  commissionRate: number; // Commission percentage (e.g., 10.0 for 10%)
+  commissionRate: number; // Default 10% commission
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  totalEarnings: number;
+  totalEarnings: number; // Total earnings from commissions
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  availableBalance: number;
+  pendingEarnings: number; // Earnings not yet paid out
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  totalWithdrawn: number;
+  paidEarnings: number; // Earnings already paid out
 
   @Column({
     type: 'varchar',
-    default: InfluencerStatus.ACTIVE,
+    length: 20,
+    default: InfluencerStatus.PENDING,
   })
   status: InfluencerStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   stripeAccountId: string; // For payouts
 
-  @Column({ nullable: true })
-  bankAccountId: string; // For bank transfers
+  @Column({ type: 'text', nullable: true })
+  bio: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  website: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  profileImageUrl: string;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string; // Admin notes
 
-  @Column({ default: 0 })
-  totalReferrals: number;
+  @Column({ type: 'datetime', nullable: true })
+  approvedAt: Date;
 
-  @Column({ default: 0 })
-  successfulReferrals: number;
+  @Column('uuid', { nullable: true })
+  approvedBy: string; // Admin user ID who approved
 
   @CreateDateColumn()
   createdAt: Date;
@@ -65,7 +82,8 @@ export class Influencer {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToOne(() => User, (user) => user.influencer)
+  // Relations
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 
@@ -75,13 +93,21 @@ export class Influencer {
   @OneToMany(() => Commission, (commission) => commission.influencer)
   commissions: Commission[];
 
+  // Computed properties
+  get isActive(): boolean {
+    return this.status === InfluencerStatus.ACTIVE;
+  }
+
+  get totalReferrals(): number {
+    return this.commissions?.length || 0;
+  }
+
+  get successfulReferrals(): number {
+    return this.commissions?.filter(c => c.status === 'approved' || c.status === 'paid').length || 0;
+  }
+
   get conversionRate(): number {
     if (this.totalReferrals === 0) return 0;
     return (this.successfulReferrals / this.totalReferrals) * 100;
-  }
-
-  get averageCommission(): number {
-    if (this.successfulReferrals === 0) return 0;
-    return this.totalEarnings / this.successfulReferrals;
   }
 }

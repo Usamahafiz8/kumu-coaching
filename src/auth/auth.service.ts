@@ -10,7 +10,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -18,7 +18,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthResponseDto } from '../common/dto/auth-response.dto';
-import { EmailService } from '../common/services/email.service';
+import { EmailService } from '../email/email.service';
+import { VerificationCodesService } from '../verification-codes/verification-codes.service';
 
 @Injectable()
 export class AuthService {
@@ -30,10 +31,11 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private verificationCodesService: VerificationCodesService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { email, password, firstName, lastName, phone } = registerDto;
+    const { email, password, firstName, lastName, phone, role } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.userRepository.findOne({
@@ -44,22 +46,24 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Create new user
+    // Create new user (email not verified initially)
     const user = this.userRepository.create({
       email,
       password,
       firstName,
       lastName,
       phone,
+      role: role || UserRole.PLAYER, // Default to player if no role specified
+      emailVerified: false, // Email not verified initially
     });
 
     const savedUser = await this.userRepository.save(user);
 
+    // Send email verification code
+    await this.verificationCodesService.sendEmailVerificationCode(savedUser);
+
     // Generate tokens
     const tokens = await this.generateTokens(savedUser);
-
-    // Send welcome email
-    await this.emailService.sendWelcomeEmail(savedUser.email, savedUser.firstName);
 
     return {
       ...tokens,
@@ -131,7 +135,18 @@ export class AuthService {
     await this.passwordResetRepository.save(passwordReset);
 
     // Send reset email
-    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    await this.emailService.sendEmail({
+      to: user.email,
+      subject: 'Password Reset Request',
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>Hello ${user.firstName},</p>
+        <p>You requested a password reset. Click the link below to reset your password:</p>
+        <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${resetToken}">Reset Password</a></p>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this reset, please ignore this email.</p>
+      `,
+    });
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<void> {

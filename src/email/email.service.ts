@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
-import { EmailConfig, EmailConfigKey } from '../entities/email-config.entity';
 import { EmailTemplate, EmailTemplateType, EmailTemplateStatus } from '../entities/email-template.entity';
-import { ConfigService } from '../config/config.service';
-import { AppConfig } from '../entities/app-config.entity';
 
 export interface EmailOptions {
   to: string | string[];
@@ -31,11 +28,8 @@ export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
 
   constructor(
-    @InjectRepository(EmailConfig)
-    private emailConfigRepository: Repository<EmailConfig>,
     @InjectRepository(EmailTemplate)
     private emailTemplateRepository: Repository<EmailTemplate>,
-    private configService: ConfigService,
   ) {}
 
   async initializeTransporter(): Promise<void> {
@@ -49,8 +43,8 @@ export class EmailService {
 
       this.transporter = nodemailer.createTransport({
         host: emailConfig.host,
-        port: parseInt(emailConfig.port),
-        secure: emailConfig.secure === 'true',
+        port: emailConfig.port,
+        secure: emailConfig.secure,
         auth: {
           user: emailConfig.user,
           pass: emailConfig.pass,
@@ -68,49 +62,27 @@ export class EmailService {
     }
   }
 
-  private async getEmailConfig(): Promise<{
+  private getEmailConfig(): {
     host: string;
-    port: string;
+    port: number;
     user: string;
     pass: string;
-    secure: string;
+    secure: boolean;
     fromEmail: string;
     fromName: string;
     replyTo: string;
     enabled: boolean;
-  }> {
-    const [
-      host,
-      port,
-      user,
-      pass,
-      secure,
-      fromEmail,
-      fromName,
-      replyTo,
-      enabled,
-    ] = await Promise.all([
-      this.configService.getConfig(EmailConfigKey.SMTP_HOST),
-      this.configService.getConfig(EmailConfigKey.SMTP_PORT),
-      this.configService.getConfig(EmailConfigKey.SMTP_USER),
-      this.configService.getConfig(EmailConfigKey.SMTP_PASS),
-      this.configService.getConfig(EmailConfigKey.SMTP_SECURE),
-      this.configService.getConfig(EmailConfigKey.FROM_EMAIL),
-      this.configService.getConfig(EmailConfigKey.FROM_NAME),
-      this.configService.getConfig(EmailConfigKey.REPLY_TO),
-      this.configService.getConfig(EmailConfigKey.EMAIL_ENABLED),
-    ]);
-
+  } {
     return {
-      host: host || '',
-      port: port || '587',
-      user: user || '',
-      pass: pass || '',
-      secure: secure || 'false',
-      fromEmail: fromEmail || '',
-      fromName: fromName || '',
-      replyTo: replyTo || '',
-      enabled: enabled === 'true',
+      host: process.env.EMAIL_HOST || '',
+      port: parseInt(process.env.EMAIL_PORT || '587'),
+      user: process.env.EMAIL_USER || '',
+      pass: process.env.EMAIL_PASS || '',
+      secure: process.env.EMAIL_SECURE === 'true',
+      fromEmail: process.env.EMAIL_FROM || process.env.EMAIL_USER || '',
+      fromName: process.env.EMAIL_FROM_NAME || 'Kumu Coaching',
+      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || process.env.EMAIL_USER || '',
+      enabled: process.env.EMAIL_ENABLED !== 'false',
     };
   }
 
@@ -254,58 +226,112 @@ export class EmailService {
   }
 
   // Configuration management methods
-  async setEmailConfig(config: {
-    host?: string;
-    port?: string;
-    user?: string;
-    pass?: string;
-    secure?: boolean;
-    fromEmail?: string;
-    fromName?: string;
-    replyTo?: string;
-    enabled?: boolean;
-  }): Promise<void> {
-    const promises: Promise<AppConfig | EmailConfig>[] = [];
-
-    if (config.host !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.SMTP_HOST, config.host, 'SMTP Host'));
-    }
-    if (config.port !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.SMTP_PORT, config.port.toString(), 'SMTP Port'));
-    }
-    if (config.user !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.SMTP_USER, config.user, 'SMTP Username'));
-    }
-    if (config.pass !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.SMTP_PASS, config.pass, 'SMTP Password', true));
-    }
-    if (config.secure !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.SMTP_SECURE, config.secure.toString(), 'SMTP Secure'));
-    }
-    if (config.fromEmail !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.FROM_EMAIL, config.fromEmail, 'From Email'));
-    }
-    if (config.fromName !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.FROM_NAME, config.fromName, 'From Name'));
-    }
-    if (config.replyTo !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.REPLY_TO, config.replyTo, 'Reply To Email'));
-    }
-    if (config.enabled !== undefined) {
-      promises.push(this.configService.setConfig(EmailConfigKey.EMAIL_ENABLED, config.enabled.toString(), 'Email Enabled'));
-    }
-
-    await Promise.all(promises);
-    
-    // Reinitialize transporter with new config
-    await this.initializeTransporter();
-  }
-
   async getEmailConfigForAdmin(): Promise<any> {
-    const config = await this.getEmailConfig();
+    const config = this.getEmailConfig();
     return {
       ...config,
       pass: config.pass ? '***hidden***' : '', // Hide password in admin response
     };
+  }
+
+  // Subscription confirmation email
+  async sendSubscriptionConfirmation(data: {
+    to: string;
+    firstName: string;
+    lastName: string;
+    planName: string;
+    amount: number;
+    currency: string;
+    subscriptionId: string;
+    currentPeriodEnd: Date;
+  }): Promise<boolean> {
+    const subject = 'Subscription Confirmation - Kumu Coaching';
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Subscription Confirmation</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background-color: #f9f9f9; }
+          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          .highlight { background-color: #e8f5e8; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Subscription Confirmed!</h1>
+          </div>
+          
+          <div class="content">
+            <h2>Hello ${data.firstName} ${data.lastName},</h2>
+            
+            <p>Thank you for subscribing to Kumu Coaching! Your payment has been successfully processed and your subscription is now active.</p>
+            
+            <div class="highlight">
+              <h3>Subscription Details:</h3>
+              <ul>
+                <li><strong>Plan:</strong> ${data.planName}</li>
+                <li><strong>Amount:</strong> ${data.currency.toUpperCase()} ${data.amount}</li>
+                <li><strong>Subscription ID:</strong> ${data.subscriptionId}</li>
+                <li><strong>Next Billing Date:</strong> ${data.currentPeriodEnd.toLocaleDateString()}</li>
+              </ul>
+            </div>
+            
+            <p>You now have full access to all premium features. You can manage your subscription and access your dashboard at any time.</p>
+            
+            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            
+            <p>Welcome to the Kumu Coaching community!</p>
+            
+            <p>Best regards,<br>
+            The Kumu Coaching Team</p>
+          </div>
+          
+          <div class="footer">
+            <p>This email was sent to ${data.to}</p>
+            <p>© ${new Date().getFullYear()} Kumu Coaching. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Subscription Confirmation - Kumu Coaching
+      
+      Hello ${data.firstName} ${data.lastName},
+      
+      Thank you for subscribing to Kumu Coaching! Your payment has been successfully processed and your subscription is now active.
+      
+      Subscription Details:
+      - Plan: ${data.planName}
+      - Amount: ${data.currency.toUpperCase()} ${data.amount}
+      - Subscription ID: ${data.subscriptionId}
+      - Next Billing Date: ${data.currentPeriodEnd.toLocaleDateString()}
+      
+      You now have full access to all premium features. You can manage your subscription and access your dashboard at any time.
+      
+      If you have any questions or need assistance, please don't hesitate to contact our support team.
+      
+      Welcome to the Kumu Coaching community!
+      
+      Best regards,
+      The Kumu Coaching Team
+      
+      This email was sent to ${data.to}
+      © ${new Date().getFullYear()} Kumu Coaching. All rights reserved.
+    `;
+
+    return this.sendEmail({
+      to: data.to,
+      subject,
+      html: htmlContent,
+      text: textContent,
+    });
   }
 }

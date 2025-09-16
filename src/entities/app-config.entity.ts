@@ -7,12 +7,7 @@ import {
 } from 'typeorm';
 
 export enum ConfigKey {
-  STRIPE_SECRET_KEY = 'stripe_secret_key',
-  STRIPE_PUBLISHABLE_KEY = 'stripe_publishable_key',
-  STRIPE_WEBHOOK_SECRET = 'stripe_webhook_secret',
-  STRIPE_CURRENCY = 'stripe_currency',
-  STRIPE_MODE = 'stripe_mode',
-  STRIPE_ACCOUNT_ID = 'stripe_account_id',
+  // Add other config keys here as needed
 }
 
 @Entity('app_configs')

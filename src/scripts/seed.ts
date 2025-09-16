@@ -2,14 +2,9 @@ import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { runSeeds } from '../database/seeds';
 import { User } from '../entities/user.entity';
-import { SubscriptionPlan } from '../entities/subscription-plan.entity';
-import { Subscription } from '../entities/subscription.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
-import { Influencer } from '../entities/influencer.entity';
 import { PromoCode } from '../entities/promo-code.entity';
-import { Commission } from '../entities/commission.entity';
 import { AppConfig } from '../entities/app-config.entity';
-import { EmailConfig } from '../entities/email-config.entity';
 import { EmailTemplate } from '../entities/email-template.entity';
 
 // Load environment variables
@@ -18,7 +13,7 @@ config();
 const AppDataSource = new DataSource({
   type: 'sqlite',
   database: 'kumu_coaching.db',
-  entities: [User, SubscriptionPlan, Subscription, PasswordReset, Influencer, PromoCode, Commission, AppConfig, EmailConfig, EmailTemplate],
+  entities: [User, PasswordReset, PromoCode, AppConfig, EmailTemplate],
   synchronize: true,
   logging: false,
 });

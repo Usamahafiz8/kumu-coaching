@@ -1,17 +1,12 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { StripeService } from './stripe.service';
+import { Module, forwardRef } from '@nestjs/common';
 import { StripeController } from './stripe.controller';
-import stripeConfig from '../config/stripe.config';
-import { ConfigModule as AppConfigModule } from '../config/config.module';
+import { StripeService } from './stripe.service';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
-  imports: [
-    ConfigModule.forFeature(stripeConfig),
-    AppConfigModule,
-  ],
-  providers: [StripeService],
+  imports: [forwardRef(() => SubscriptionsModule)],
   controllers: [StripeController],
+  providers: [StripeService],
   exports: [StripeService],
 })
 export class StripeModule {}

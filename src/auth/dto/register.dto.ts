@@ -1,5 +1,6 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, Matches, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '../../entities/user.entity';
 
 export class RegisterDto {
   @ApiProperty({
@@ -53,4 +54,15 @@ export class RegisterDto {
     message: 'Please provide a valid phone number',
   })
   phone?: string;
+
+  @ApiProperty({
+    description: 'User role',
+    example: 'player',
+    enum: UserRole,
+    required: false,
+    default: UserRole.PLAYER,
+  })
+  @IsEnum(UserRole, { message: 'Role must be either admin, player, or influencer' })
+  @IsOptional()
+  role?: UserRole;
 }

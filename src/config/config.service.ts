@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppConfig, ConfigKey } from '../entities/app-config.entity';
-import { EmailConfig, EmailConfigKey } from '../entities/email-config.entity';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,39 +11,25 @@ export class ConfigService {
   constructor(
     @InjectRepository(AppConfig)
     private configRepository: Repository<AppConfig>,
-    @InjectRepository(EmailConfig)
-    private emailConfigRepository: Repository<EmailConfig>,
   ) {}
 
-  async getConfig(key: ConfigKey | EmailConfigKey): Promise<string | null> {
-    // Try AppConfig first
-    let config = await this.configRepository.findOne({ where: { key: key as ConfigKey } });
+  async getConfig(key: ConfigKey): Promise<string | null> {
+    const config = await this.configRepository.findOne({ where: { key } });
+    if (!config) return null;
     
-    // If not found in AppConfig, try EmailConfig
-    if (!config) {
-      const emailConfig = await this.emailConfigRepository.findOne({ where: { key: key as EmailConfigKey } });
-      if (!emailConfig) return null;
-      
-      if (emailConfig.isEncrypted) {
-        return this.decrypt(emailConfig.value);
-      }
-      return emailConfig.value;
-    }
-
     if (config.isEncrypted) {
       return this.decrypt(config.value);
     }
     return config.value;
   }
 
-  async setConfig(key: ConfigKey | EmailConfigKey, value: string, description?: string, encrypt: boolean = false): Promise<AppConfig | EmailConfig> {
+  async setConfig(key: ConfigKey, value: string, description?: string, encrypt: boolean = false): Promise<AppConfig> {
     let finalValue = value;
     if (encrypt) {
       finalValue = this.encrypt(value);
     }
 
-    // Try AppConfig first
-    let existingConfig = await this.configRepository.findOne({ where: { key: key as ConfigKey } });
+    let existingConfig = await this.configRepository.findOne({ where: { key } });
     
     if (existingConfig) {
       existingConfig.value = finalValue;
@@ -53,116 +38,24 @@ export class ConfigService {
       return this.configRepository.save(existingConfig);
     }
 
-    // Try EmailConfig
-    let existingEmailConfig = await this.emailConfigRepository.findOne({ where: { key: key as EmailConfigKey } });
-    
-    if (existingEmailConfig) {
-      existingEmailConfig.value = finalValue;
-      existingEmailConfig.isEncrypted = encrypt;
-      if (description) existingEmailConfig.description = description;
-      return this.emailConfigRepository.save(existingEmailConfig);
-    }
-
-    // Create new config - determine which repository to use based on key type
-    if (Object.values(ConfigKey).includes(key as ConfigKey)) {
-      const config = this.configRepository.create({
-        key: key as ConfigKey,
-        value: finalValue,
-        description,
-        isEncrypted: encrypt,
-      });
-      return this.configRepository.save(config);
-    } else {
-      const emailConfig = this.emailConfigRepository.create({
-        key: key as EmailConfigKey,
-        value: finalValue,
-        description,
-        isEncrypted: encrypt,
-      });
-      return this.emailConfigRepository.save(emailConfig);
-    }
+    // Create new config
+    const config = this.configRepository.create({
+      key,
+      value: finalValue,
+      description,
+      isEncrypted: encrypt,
+    });
+    return this.configRepository.save(config);
   }
 
   async getAllConfigs(): Promise<AppConfig[]> {
     return this.configRepository.find({ order: { key: 'ASC' } });
   }
 
-  async deleteConfig(key: ConfigKey | EmailConfigKey): Promise<void> {
-    // Try to delete from AppConfig first
-    const appResult = await this.configRepository.delete({ key: key as ConfigKey });
-    
-    // If not found in AppConfig, try EmailConfig
-    if (appResult.affected === 0) {
-      await this.emailConfigRepository.delete({ key: key as EmailConfigKey });
-    }
+  async deleteConfig(key: ConfigKey): Promise<void> {
+    await this.configRepository.delete({ key });
   }
 
-  // Stripe-specific methods
-  async getStripeConfig(): Promise<{
-    secretKey?: string;
-    publishableKey?: string;
-    webhookSecret?: string;
-    currency?: string;
-    mode?: string;
-    accountId?: string;
-  }> {
-    const [
-      secretKey,
-      publishableKey,
-      webhookSecret,
-      currency,
-      mode,
-      accountId,
-    ] = await Promise.all([
-      this.getConfig(ConfigKey.STRIPE_SECRET_KEY),
-      this.getConfig(ConfigKey.STRIPE_PUBLISHABLE_KEY),
-      this.getConfig(ConfigKey.STRIPE_WEBHOOK_SECRET),
-      this.getConfig(ConfigKey.STRIPE_CURRENCY),
-      this.getConfig(ConfigKey.STRIPE_MODE),
-      this.getConfig(ConfigKey.STRIPE_ACCOUNT_ID),
-    ]);
-
-    return {
-      secretKey: secretKey || undefined,
-      publishableKey: publishableKey || undefined,
-      webhookSecret: webhookSecret || undefined,
-      currency: currency || 'usd',
-      mode: mode || 'test',
-      accountId: accountId || undefined,
-    };
-  }
-
-  async setStripeConfig(config: {
-    secretKey?: string;
-    publishableKey?: string;
-    webhookSecret?: string;
-    currency?: string;
-    mode?: string;
-    accountId?: string;
-  }): Promise<void> {
-    const promises: Promise<AppConfig | EmailConfig>[] = [];
-
-    if (config.secretKey) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_SECRET_KEY, config.secretKey, 'Stripe Secret Key', true));
-    }
-    if (config.publishableKey) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_PUBLISHABLE_KEY, config.publishableKey, 'Stripe Publishable Key'));
-    }
-    if (config.webhookSecret) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_WEBHOOK_SECRET, config.webhookSecret, 'Stripe Webhook Secret', true));
-    }
-    if (config.currency) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_CURRENCY, config.currency, 'Stripe Currency'));
-    }
-    if (config.mode) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_MODE, config.mode, 'Stripe Mode (test/live)'));
-    }
-    if (config.accountId) {
-      promises.push(this.setConfig(ConfigKey.STRIPE_ACCOUNT_ID, config.accountId, 'Stripe Account ID'));
-    }
-
-    await Promise.all(promises);
-  }
 
   private encrypt(text: string): string {
     const algorithm = 'aes-256-cbc';

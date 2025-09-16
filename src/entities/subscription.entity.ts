@@ -5,20 +5,16 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
-import { PromoCode } from './promo-code.entity';
-import { Commission } from './commission.entity';
 
 export enum SubscriptionStatus {
   ACTIVE = 'active',
-  EXPIRED = 'expired',
   CANCELLED = 'cancelled',
+  EXPIRED = 'expired',
   PENDING = 'pending',
-  FAILED = 'failed',
 }
 
 @Entity('subscriptions')
@@ -29,41 +25,45 @@ export class Subscription {
   @Column('uuid')
   userId: string;
 
-  @Column('uuid')
+  @Column('uuid', { nullable: true })
   planId: string;
 
-  @Column({
-    type: 'varchar',
-    default: SubscriptionStatus.PENDING,
-  })
-  status: SubscriptionStatus;
+  @Column({ type: 'varchar', length: 50 })
+  stripeSubscriptionId: string;
+
+  @Column({ type: 'varchar', length: 50 })
+  stripeCustomerId: string;
+
+  @Column({ type: 'varchar', length: 50 })
+  stripePriceId: string;
+
+  @Column({ type: 'varchar', length: 50 })
+  stripeProductId: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
-  @Column()
-  startDate: Date;
+  @Column({ type: 'varchar', length: 3, default: 'USD' })
+  currency: string;
 
-  @Column()
-  endDate: Date;
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: SubscriptionStatus.PENDING,
+  })
+  status: SubscriptionStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'datetime' })
+  currentPeriodStart: Date;
+
+  @Column({ type: 'datetime' })
+  currentPeriodEnd: Date;
+
+  @Column({ type: 'datetime', nullable: true })
   cancelledAt: Date;
 
-  @Column({ type: 'text', nullable: true })
-  cancellationReason: string | null;
-
-  @Column({ nullable: true })
-  stripeSubscriptionId: string;
-
-  @Column('uuid', { nullable: true })
-  promoCodeId: string;
-
-  @Column({ nullable: true })
-  stripePaymentIntentId: string;
-
-  @Column({ type: 'json', nullable: true })
-  metadata: Record<string, any>;
+  @Column({ type: 'datetime', nullable: true })
+  endedAt: Date;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -71,26 +71,13 @@ export class Subscription {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => User, (user) => user.subscriptions)
+  @ManyToOne(() => User, (user) => user.subscriptions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @ManyToOne(() => PromoCode, (promoCode) => promoCode.subscriptions)
-  @JoinColumn({ name: 'promoCodeId' })
-  promoCode: PromoCode;
-
-  @OneToOne(() => Commission, (commission) => commission.subscription)
-  commission: Commission;
-
-  @ManyToOne(() => SubscriptionPlan, (plan) => plan.subscriptions)
+  @ManyToOne(() => SubscriptionPlan, { nullable: true })
   @JoinColumn({ name: 'planId' })
   plan: SubscriptionPlan;
-
-  get isActive(): boolean {
-    return this.status === SubscriptionStatus.ACTIVE && new Date() <= this.endDate;
-  }
-
-  get isExpired(): boolean {
-    return new Date() > this.endDate;
-  }
 }

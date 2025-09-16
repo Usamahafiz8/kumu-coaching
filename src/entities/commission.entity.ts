@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Influencer } from './influencer.entity';
-import { Subscription } from './subscription.entity';
+import { PurchaseRecord } from './purchase-record.entity';
 
 export enum CommissionStatus {
   PENDING = 'pending',
@@ -26,31 +26,35 @@ export class Commission {
   influencerId: string;
 
   @Column('uuid')
-  subscriptionId: string;
+  purchaseRecordId: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  subscriptionAmount: number;
+  amount: number; // Commission amount earned
 
   @Column({ type: 'decimal', precision: 5, scale: 2 })
-  commissionRate: number; // Percentage at time of purchase
+  rate: number; // Commission rate used (percentage)
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  commissionAmount: number;
+  originalAmount: number; // Original purchase amount
+
+  @Column({ type: 'varchar', length: 3, default: 'USD' })
+  currency: string;
 
   @Column({
     type: 'varchar',
+    length: 20,
     default: CommissionStatus.PENDING,
   })
   status: CommissionStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   paidAt: Date;
 
-  @Column({ nullable: true })
-  payoutId: string; // Stripe payout ID
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  stripePayoutId: string; // Stripe payout ID when paid
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string; // Admin notes
 
   @CreateDateColumn()
   createdAt: Date;
@@ -58,14 +62,18 @@ export class Commission {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => Influencer, (influencer) => influencer.commissions)
+  // Relations
+  @ManyToOne(() => Influencer, (influencer) => influencer.commissions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'influencerId' })
   influencer: Influencer;
 
-  @ManyToOne(() => Subscription, (subscription) => subscription.commission)
-  @JoinColumn({ name: 'subscriptionId' })
-  subscription: Subscription;
+  @ManyToOne(() => PurchaseRecord, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'purchaseRecordId' })
+  purchaseRecord: PurchaseRecord;
 
+  // Computed properties
   get isPaid(): boolean {
     return this.status === CommissionStatus.PAID;
   }

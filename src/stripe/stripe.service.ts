@@ -1,357 +1,158 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService as NestConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { SubscriptionPlan, PlanType } from '../entities/subscription-plan.entity';
-import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
   private stripe: Stripe;
 
-  constructor(
-    private nestConfigService: NestConfigService,
-    private configService: ConfigService,
-  ) {
-    // Initialize Stripe only when needed
-    this.initializeStripe();
-  }
-
-  private async initializeStripe(): Promise<void> {
-    try {
-      const stripeConfig = await this.configService.getStripeConfig();
-      if (stripeConfig.secretKey) {
-        this.stripe = new Stripe(stripeConfig.secretKey, {
-          apiVersion: '2025-08-27.basil',
-        });
-      }
-    } catch (error) {
-      this.logger.warn('Failed to initialize Stripe from database config, falling back to environment variables');
-      // Fallback to environment variables
-      const secretKey = this.nestConfigService.get<string>('stripe.secretKey');
-      if (secretKey) {
-        this.stripe = new Stripe(secretKey, {
-          apiVersion: '2025-08-27.basil',
-        });
-      }
+  constructor(private configService: ConfigService) {
+    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (secretKey) {
+      this.stripe = new Stripe(secretKey, {
+        apiVersion: '2025-08-27.basil',
+      });
+      this.logger.log('Stripe initialized successfully');
+    } else {
+      this.logger.warn('Stripe secret key not found in environment variables');
     }
   }
 
-  private async ensureStripeInitialized(): Promise<void> {
-    if (!this.stripe) {
-      try {
-        const stripeConfig = await this.configService.getStripeConfig();
-        if (!stripeConfig.secretKey) {
-          throw new Error('Stripe secret key is not configured');
-        }
-        this.stripe = new Stripe(stripeConfig.secretKey, {
-          apiVersion: '2025-08-27.basil',
-        });
-      } catch (error) {
-        // Fallback to environment variables
-        const secretKey = this.nestConfigService.get<string>('stripe.secretKey');
-        if (!secretKey) {
-          throw new Error('Stripe secret key is not configured');
-        }
-        this.stripe = new Stripe(secretKey, {
-          apiVersion: '2025-08-27.basil',
-        });
-      }
-    }
+  /**
+   * Create a Stripe customer
+   */
+  async createCustomer(email: string, name: string): Promise<Stripe.Customer> {
+    return this.stripe.customers.create({
+      email,
+      name,
+    });
   }
 
-  async createProduct(plan: SubscriptionPlan): Promise<{ productId: string; priceId: string }> {
-    await this.ensureStripeInitialized();
-    try {
-      // Create Stripe product
-      const product = await this.stripe.products.create({
-        name: plan.name,
-        description: plan.description || undefined,
-        metadata: {
-          planId: plan.id,
-          type: plan.type,
-          durationInMonths: plan.durationInMonths.toString(),
+  /**
+   * Create a Stripe product
+   */
+  async createProduct(name: string, description?: string): Promise<Stripe.Product> {
+    return this.stripe.products.create({
+      name,
+      description,
+      type: 'service',
+    });
+  }
+
+  /**
+   * Create a Stripe price
+   */
+  async createPrice({
+    productId,
+    amount,
+    currency,
+    interval,
+  }: {
+    productId: string;
+    amount: number;
+    currency: string;
+    interval: 'month' | 'year';
+  }): Promise<Stripe.Price> {
+    return this.stripe.prices.create({
+      product: productId,
+      unit_amount: Math.round(amount * 100), // Convert to cents
+      currency: currency.toLowerCase(),
+      recurring: {
+        interval,
+      },
+    });
+  }
+
+  /**
+   * Create a Stripe checkout session
+   */
+  async createCheckoutSession({
+    customerId,
+    priceId,
+    successUrl,
+    cancelUrl,
+    discountCode,
+  }: {
+    customerId: string;
+    priceId: string;
+    successUrl: string;
+    cancelUrl: string;
+    discountCode?: string;
+  }): Promise<Stripe.Checkout.Session> {
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
         },
-      });
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        type: 'subscription',
+      },
+    };
 
-      // Create Stripe price
-      const price = await this.stripe.prices.create({
-        product: product.id,
-        unit_amount: Math.round(plan.price * 100), // Convert to cents
-        currency: (await this.configService.getStripeConfig()).currency || 'usd',
-        recurring: plan.type !== PlanType.LIFETIME ? {
-          interval: this.getStripeInterval(plan.type),
-          interval_count: this.getIntervalCount(plan.type),
-        } : undefined,
-        metadata: {
-          planId: plan.id,
+    // Add discount code if provided
+    if (discountCode) {
+      sessionConfig.discounts = [
+        {
+          coupon: discountCode,
         },
-      });
-
-      this.logger.log(`Created Stripe product and price for plan: ${plan.name}`);
-      return {
-        productId: product.id,
-        priceId: price.id,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to create Stripe product for plan ${plan.name}:`, error);
-      throw error;
+      ];
     }
+
+    return this.stripe.checkout.sessions.create(sessionConfig);
   }
 
-  async updateProduct(plan: SubscriptionPlan): Promise<{ productId: string; priceId: string }> {
-    this.ensureStripeInitialized();
-    try {
-      if (!plan.stripeProductId) {
-        return this.createProduct(plan);
-      }
-
-      // Update existing product
-      await this.stripe.products.update(plan.stripeProductId, {
-        name: plan.name,
-        description: plan.description || undefined,
-        metadata: {
-          planId: plan.id,
-          type: plan.type,
-          durationInMonths: plan.durationInMonths.toString(),
-        },
-      });
-
-      // Create new price if plan price changed
-      const price = await this.stripe.prices.create({
-        product: plan.stripeProductId,
-        unit_amount: Math.round(plan.price * 100),
-        currency: (await this.configService.getStripeConfig()).currency || 'usd',
-        recurring: plan.type !== PlanType.LIFETIME ? {
-          interval: this.getStripeInterval(plan.type),
-          interval_count: this.getIntervalCount(plan.type),
-        } : undefined,
-        metadata: {
-          planId: plan.id,
-        },
-      });
-
-      this.logger.log(`Updated Stripe product and created new price for plan: ${plan.name}`);
-      return {
-        productId: plan.stripeProductId,
-        priceId: price.id,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to update Stripe product for plan ${plan.name}:`, error);
-      throw error;
-    }
-  }
-
-  async deleteProduct(productId: string): Promise<void> {
-    this.ensureStripeInitialized();
-    try {
-      await this.stripe.products.del(productId);
-      this.logger.log(`Deleted Stripe product: ${productId}`);
-    } catch (error) {
-      this.logger.error(`Failed to delete Stripe product ${productId}:`, error);
-      throw error;
-    }
-  }
-
-  async createCheckoutSession(
-    priceId: string,
-    userId: string,
-    successUrl: string,
-    cancelUrl: string,
-    metadata?: Record<string, any>
-  ): Promise<{ sessionId: string; url: string }> {
-    this.ensureStripeInitialized();
-    try {
-      const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        customer_email: metadata?.email,
-        metadata: {
-          userId,
-          ...metadata,
-        },
-      });
-
-      this.logger.log(`Created checkout session for user ${userId}`);
-      return {
-        sessionId: session.id,
-        url: session.url || '',
-      };
-    } catch (error) {
-      this.logger.error(`Failed to create checkout session for user ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  async createCustomerPortalSession(
-    customerId: string,
-    returnUrl: string
-  ): Promise<{ url: string }> {
-    this.ensureStripeInitialized();
-    try {
-      const session = await this.stripe.billingPortal.sessions.create({
-        customer: customerId,
-        return_url: returnUrl,
-      });
-
-      this.logger.log(`Created customer portal session for customer ${customerId}`);
-      return {
-        url: session.url,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to create customer portal session for customer ${customerId}:`, error);
-      throw error;
-    }
-  }
-
+  /**
+   * Retrieve a Stripe subscription
+   */
   async getSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.subscriptions.retrieve(subscriptionId);
-    } catch (error) {
-      this.logger.error(`Failed to retrieve subscription ${subscriptionId}:`, error);
-      throw error;
-    }
+    return this.stripe.subscriptions.retrieve(subscriptionId);
   }
 
+  /**
+   * Cancel a Stripe subscription
+   */
   async cancelSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.subscriptions.cancel(subscriptionId);
-    } catch (error) {
-      this.logger.error(`Failed to cancel subscription ${subscriptionId}:`, error);
-      throw error;
-    }
+    return this.stripe.subscriptions.cancel(subscriptionId);
   }
 
-  async getCustomer(customerId: string): Promise<Stripe.Customer> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.customers.retrieve(customerId) as Stripe.Customer;
-    } catch (error) {
-      this.logger.error(`Failed to retrieve customer ${customerId}:`, error);
-      throw error;
-    }
-  }
-
-  async createCustomer(email: string, name?: string): Promise<Stripe.Customer> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.customers.create({
-        email,
-        name,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to create customer for email ${email}:`, error);
-      throw error;
-    }
-  }
-
-  async constructWebhookEvent(payload: string | Buffer, signature: string): Promise<Stripe.Event> {
-    this.ensureStripeInitialized();
-    const webhookSecret = (await this.configService.getStripeConfig()).webhookSecret;
+  /**
+   * Construct webhook event from raw body and signature
+   */
+  constructWebhookEvent(body: string, signature: string): Stripe.Event {
+    const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
     if (!webhookSecret) {
-      throw new Error('Stripe webhook secret is not configured');
+      throw new Error('Stripe webhook secret not configured');
     }
+    return this.stripe.webhooks.constructEvent(body, signature, webhookSecret);
+  }
 
+  /**
+   * Get Stripe configuration for frontend
+   */
+  getConfig() {
+    return {
+      publishableKey: this.configService.get<string>('STRIPE_PUBLISHABLE_KEY'),
+      priceId: this.configService.get<string>('STRIPE_PRICE_ID'),
+    };
+  }
+
+  /**
+   * Retrieve a checkout session
+   */
+  async getCheckoutSession(sessionId: string): Promise<Stripe.Checkout.Session | null> {
     try {
-      return this.stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      return await this.stripe.checkout.sessions.retrieve(sessionId);
     } catch (error) {
-      this.logger.error('Failed to construct webhook event:', error);
-      throw error;
-    }
-  }
-
-  async getPublishableKey(): Promise<string> {
-    const config = await this.configService.getStripeConfig();
-    return config.publishableKey || '';
-  }
-
-  async getMode(): Promise<string> {
-    const config = await this.configService.getStripeConfig();
-    return config.mode || 'test';
-  }
-
-  async getAccount(): Promise<Stripe.Account> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.accounts.retrieve();
-    } catch (error) {
-      this.logger.error('Failed to retrieve Stripe account:', error);
-      throw error;
-    }
-  }
-
-  async createPayout(accountId: string, amount: number, description?: string): Promise<Stripe.Payout> {
-    this.ensureStripeInitialized();
-    
-    // Convert amount to cents
-    const amountInCents = Math.round(amount * 100);
-    
-    try {
-      return await this.stripe.payouts.create({
-        amount: amountInCents,
-        currency: (await this.configService.getStripeConfig()).currency || 'usd',
-        destination: accountId,
-        description: description || 'Influencer commission payout',
-      });
-    } catch (error) {
-      this.logger.error(`Failed to create payout for account ${accountId}:`, error);
-      throw error;
-    }
-  }
-
-  async getPayout(payoutId: string): Promise<Stripe.Payout> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.payouts.retrieve(payoutId);
-    } catch (error) {
-      this.logger.error(`Failed to retrieve payout ${payoutId}:`, error);
-      throw error;
-    }
-  }
-
-  async listPayouts(limit: number = 10): Promise<Stripe.ApiList<Stripe.Payout>> {
-    this.ensureStripeInitialized();
-    try {
-      return await this.stripe.payouts.list({ limit });
-    } catch (error) {
-      this.logger.error('Failed to list payouts:', error);
-      throw error;
-    }
-  }
-
-  private getStripeInterval(planType: PlanType): Stripe.Price.Recurring.Interval {
-    switch (planType) {
-      case PlanType.MONTHLY:
-        return 'month';
-      case PlanType.QUARTERLY:
-        return 'month';
-      case PlanType.YEARLY:
-        return 'year';
-      default:
-        return 'month';
-    }
-  }
-
-  private getIntervalCount(planType: PlanType): number {
-    switch (planType) {
-      case PlanType.MONTHLY:
-        return 1;
-      case PlanType.QUARTERLY:
-        return 3;
-      case PlanType.YEARLY:
-        return 1;
-      default:
-        return 1;
+      this.logger.error('Failed to retrieve checkout session:', error);
+      return null;
     }
   }
 }

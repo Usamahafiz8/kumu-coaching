@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { PromoCodesController } from './promo-codes.controller';
-import { InfluencerModule } from '../influencer/influencer.module';
+import { PromoCodesService } from './promo-codes.service';
+import { PromoCode } from '../entities/promo-code.entity';
 
 @Module({
-  imports: [InfluencerModule],
+  imports: [TypeOrmModule.forFeature([PromoCode])],
   controllers: [PromoCodesController],
+  providers: [PromoCodesService],
+  exports: [PromoCodesService],
 })
 export class PromoCodesModule {}

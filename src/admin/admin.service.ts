@@ -6,26 +6,38 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, UserRole } from '../entities/user.entity';
-import { Subscription, SubscriptionStatus } from '../entities/subscription.entity';
-import { SubscriptionPlan, PlanStatus } from '../entities/subscription-plan.entity';
-import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
-import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
-import { StripeService } from '../stripe/stripe.service';
+import { User, UserRole, UserStatus } from '../entities/user.entity';
+import { CreateEmailTemplateDto } from './dto/email-template.dto';
+import { UpdateEmailTemplateDto } from './dto/email-template.dto';
+import { EmailTemplate } from '../entities/email-template.entity';
+import { EmailService } from '../email/email.service';
+import { AppConfig } from '../entities/app-config.entity';
+import { PurchaseRecord } from '../entities/purchase-record.entity';
+import { SubscriptionPlan } from '../entities/subscription-plan.entity';
+import { Influencer, InfluencerStatus } from '../entities/influencer.entity';
+import { Commission, CommissionStatus } from '../entities/commission.entity';
 
 @Injectable()
 export class AdminService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    @InjectRepository(Subscription)
-    private subscriptionRepository: Repository<Subscription>,
+    @InjectRepository(EmailTemplate)
+    private emailTemplateRepository: Repository<EmailTemplate>,
+    @InjectRepository(AppConfig)
+    private appConfigRepository: Repository<AppConfig>,
+    @InjectRepository(PurchaseRecord)
+    private purchaseRecordRepository: Repository<PurchaseRecord>,
     @InjectRepository(SubscriptionPlan)
     private subscriptionPlanRepository: Repository<SubscriptionPlan>,
-    private stripeService: StripeService,
+    @InjectRepository(Influencer)
+    private influencerRepository: Repository<Influencer>,
+    @InjectRepository(Commission)
+    private commissionRepository: Repository<Commission>,
+    private emailService: EmailService,
   ) {}
 
-  async getAllUsers(page: number = 1, limit: number = 10): Promise<{
+  async getUsers(page: number = 1, limit: number = 10): Promise<{
     users: User[];
     total: number;
     page: number;
@@ -59,9 +71,9 @@ export class AdminService {
     };
   }
 
-  async getUserById(userId: string): Promise<User> {
+  async getUser(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id },
       select: [
         'id',
         'email',
@@ -83,115 +95,8 @@ export class AdminService {
     return user;
   }
 
-  async getUserSubscriptions(userId: string): Promise<Subscription[]> {
-    return this.subscriptionRepository.find({
-      where: { userId },
-      relations: ['plan'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async getAllSubscriptions(page: number = 1, limit: number = 10): Promise<{
-    subscriptions: Subscription[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const [subscriptions, total] = await this.subscriptionRepository.findAndCount({
-      relations: ['user', 'plan'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return {
-      subscriptions,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  async getSubscriptionStats(): Promise<{
-    totalSubscriptions: number;
-    activeSubscriptions: number;
-    cancelledSubscriptions: number;
-    expiredSubscriptions: number;
-    totalRevenue: number;
-    monthlyRevenue: number;
-    planStats: Array<{
-      planName: string;
-      count: number;
-      revenue: number;
-    }>;
-  }> {
-    const [
-      totalSubscriptions,
-      activeSubscriptions,
-      cancelledSubscriptions,
-      expiredSubscriptions,
-    ] = await Promise.all([
-      this.subscriptionRepository.count(),
-      this.subscriptionRepository.count({
-        where: { status: SubscriptionStatus.ACTIVE },
-      }),
-      this.subscriptionRepository.count({
-        where: { status: SubscriptionStatus.CANCELLED },
-      }),
-      this.subscriptionRepository.count({
-        where: { status: SubscriptionStatus.EXPIRED },
-      }),
-    ]);
-
-    // Calculate total revenue
-    const totalRevenueResult = await this.subscriptionRepository
-      .createQueryBuilder('subscription')
-      .select('SUM(subscription.amount)', 'total')
-      .getRawOne();
-
-    // Calculate monthly revenue (current month)
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
-
-    const monthlyRevenueResult = await this.subscriptionRepository
-      .createQueryBuilder('subscription')
-      .select('SUM(subscription.amount)', 'total')
-      .where('subscription.createdAt >= :currentMonth', { currentMonth })
-      .getRawOne();
-
-    // Get plan statistics
-    const planStats = await this.subscriptionRepository
-      .createQueryBuilder('subscription')
-      .leftJoin('subscription.plan', 'plan')
-      .select('plan.name', 'planName')
-      .addSelect('COUNT(subscription.id)', 'count')
-      .addSelect('SUM(subscription.amount)', 'revenue')
-      .groupBy('plan.id, plan.name')
-      .getRawMany();
-
-    return {
-      totalSubscriptions,
-      activeSubscriptions,
-      cancelledSubscriptions,
-      expiredSubscriptions,
-      totalRevenue: parseFloat(totalRevenueResult?.total || '0'),
-      monthlyRevenue: parseFloat(monthlyRevenueResult?.total || '0'),
-      planStats: planStats.map(stat => ({
-        planName: stat.planName,
-        count: parseInt(stat.count),
-        revenue: parseFloat(stat.revenue || '0'),
-      })),
-    };
-  }
-
-  async updateUserStatus(userId: string, status: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
+  async updateUserStatus(id: string, status: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -200,24 +105,8 @@ export class AdminService {
     return this.userRepository.save(user);
   }
 
-  async updateUserRole(userId: string, role: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    user.role = role as UserRole;
-    return this.userRepository.save(user);
-  }
-
-  async deleteUser(userId: string): Promise<void> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
+  async deleteUser(id: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -225,32 +114,130 @@ export class AdminService {
     await this.userRepository.remove(user);
   }
 
-  // Subscription Plan Management Methods
-  async getAllSubscriptionPlans(page: number = 1, limit: number = 10): Promise<{
-    plans: SubscriptionPlan[];
+  async getStats(): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    verifiedUsers: number;
+    adminUsers: number;
+  }> {
+    const [totalUsers, activeUsers, verifiedUsers, adminUsers] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({ where: { status: UserStatus.ACTIVE } }),
+      this.userRepository.count({ where: { emailVerified: true } }),
+      this.userRepository.count({ where: { role: UserRole.ADMIN } }),
+    ]);
+
+    return {
+      totalUsers,
+      activeUsers,
+      verifiedUsers,
+      adminUsers,
+    };
+  }
+
+
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return this.emailTemplateRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate> {
+    const template = await this.emailTemplateRepository.findOne({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Email template not found');
+    }
+
+    return template;
+  }
+
+  async createEmailTemplate(createTemplateDto: CreateEmailTemplateDto): Promise<EmailTemplate> {
+    const template = this.emailTemplateRepository.create(createTemplateDto);
+    return this.emailTemplateRepository.save(template);
+  }
+
+  async updateEmailTemplate(id: string, updateTemplateDto: UpdateEmailTemplateDto): Promise<EmailTemplate> {
+    const template = await this.emailTemplateRepository.findOne({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Email template not found');
+    }
+
+    Object.assign(template, updateTemplateDto);
+    return this.emailTemplateRepository.save(template);
+  }
+
+  async deleteEmailTemplate(id: string): Promise<void> {
+    const template = await this.emailTemplateRepository.findOne({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Email template not found');
+    }
+
+    await this.emailTemplateRepository.remove(template);
+  }
+
+  // App Configuration Management
+  async getAppConfigs(): Promise<AppConfig[]> {
+    return this.appConfigRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createAppConfig(configData: Partial<AppConfig>): Promise<AppConfig> {
+    const config = this.appConfigRepository.create(configData);
+    return this.appConfigRepository.save(config);
+  }
+
+  async updateAppConfig(id: string, configData: Partial<AppConfig>): Promise<AppConfig> {
+    const config = await this.appConfigRepository.findOne({
+      where: { id },
+    });
+
+    if (!config) {
+      throw new NotFoundException('App configuration not found');
+    }
+
+    Object.assign(config, configData);
+    return this.appConfigRepository.save(config);
+  }
+
+  async deleteAppConfig(id: string): Promise<void> {
+    const config = await this.appConfigRepository.findOne({
+      where: { id },
+    });
+
+    if (!config) {
+      throw new NotFoundException('App configuration not found');
+    }
+
+    await this.appConfigRepository.remove(config);
+  }
+
+  // Purchase Records Management
+  async getPurchaseRecords(page: number = 1, limit: number = 50): Promise<{
+    records: PurchaseRecord[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   }> {
-    const [plans, total] = await this.subscriptionPlanRepository.findAndCount({
+    const [records, total] = await this.purchaseRecordRepository.findAndCount({
+      relations: ['user', 'plan', 'promoCode'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
 
-    // Add subscription count for each plan
-    const plansWithCounts = await Promise.all(
-      plans.map(async (plan) => {
-        const subscriptionCount = await this.subscriptionRepository.count({
-          where: { planId: plan.id, status: SubscriptionStatus.ACTIVE },
-        });
-        return { ...plan, subscriptionCount };
-      })
-    );
-
     return {
-      plans: plansWithCounts,
+      records,
       total,
       page,
       limit,
@@ -258,7 +245,32 @@ export class AdminService {
     };
   }
 
-  async getSubscriptionPlanById(id: string): Promise<SubscriptionPlan> {
+  async getPurchaseRecord(id: string): Promise<PurchaseRecord> {
+    const record = await this.purchaseRecordRepository.findOne({
+      where: { id },
+      relations: ['user', 'plan', 'promoCode'],
+    });
+
+    if (!record) {
+      throw new NotFoundException('Purchase record not found');
+    }
+
+    return record;
+  }
+
+  // Subscription Plans Management (Admin)
+  async getAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return this.subscriptionPlanRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createSubscriptionPlan(planData: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
+    const plan = this.subscriptionPlanRepository.create(planData);
+    return this.subscriptionPlanRepository.save(plan);
+  }
+
+  async updateSubscriptionPlan(id: string, planData: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
     const plan = await this.subscriptionPlanRepository.findOne({
       where: { id },
     });
@@ -267,87 +279,8 @@ export class AdminService {
       throw new NotFoundException('Subscription plan not found');
     }
 
-    return plan;
-  }
-
-  async createSubscriptionPlan(createPlanDto: CreateSubscriptionPlanDto): Promise<SubscriptionPlan> {
-    // Check if a plan with the same name already exists
-    const existingPlan = await this.subscriptionPlanRepository.findOne({
-      where: { name: createPlanDto.name },
-    });
-
-    if (existingPlan) {
-      throw new BadRequestException('A subscription plan with this name already exists');
-    }
-
-    const plan = this.subscriptionPlanRepository.create({
-      ...createPlanDto,
-      status: createPlanDto.status || PlanStatus.ACTIVE,
-      isActive: createPlanDto.isActive !== undefined ? createPlanDto.isActive : true,
-    });
-
-    const savedPlan = await this.subscriptionPlanRepository.save(plan);
-
-    // Create Stripe product and price
-    try {
-      const stripeData = await this.stripeService.createProduct(savedPlan);
-      savedPlan.stripeProductId = stripeData.productId;
-      savedPlan.stripePriceId = stripeData.priceId;
-      return this.subscriptionPlanRepository.save(savedPlan);
-    } catch (error) {
-      // If Stripe creation fails, delete the plan
-      await this.subscriptionPlanRepository.remove(savedPlan);
-      throw new BadRequestException('Failed to create Stripe product for the plan');
-    }
-  }
-
-  async updateSubscriptionPlan(id: string, updatePlanDto: UpdateSubscriptionPlanDto): Promise<SubscriptionPlan> {
-    const plan = await this.subscriptionPlanRepository.findOne({
-      where: { id },
-    });
-
-    if (!plan) {
-      throw new NotFoundException('Subscription plan not found');
-    }
-
-    // Check if updating name and if it conflicts with existing plan
-    if (updatePlanDto.name && updatePlanDto.name !== plan.name) {
-      const existingPlan = await this.subscriptionPlanRepository.findOne({
-        where: { name: updatePlanDto.name },
-      });
-
-      if (existingPlan) {
-        throw new BadRequestException('A subscription plan with this name already exists');
-      }
-    }
-
-    // Don't allow deactivating a plan that has active subscriptions
-    if (updatePlanDto.isActive === false || updatePlanDto.status === PlanStatus.INACTIVE) {
-      const activeSubscriptions = await this.subscriptionRepository.count({
-        where: { planId: id, status: SubscriptionStatus.ACTIVE },
-      });
-
-      if (activeSubscriptions > 0) {
-        throw new BadRequestException('Cannot deactivate a plan that has active subscriptions');
-      }
-    }
-
-    Object.assign(plan, updatePlanDto);
-    const updatedPlan = await this.subscriptionPlanRepository.save(plan);
-
-    // Update Stripe product if plan details changed
-    if (updatePlanDto.name || updatePlanDto.description || updatePlanDto.price) {
-      try {
-        const stripeData = await this.stripeService.updateProduct(updatedPlan);
-        updatedPlan.stripeProductId = stripeData.productId;
-        updatedPlan.stripePriceId = stripeData.priceId;
-        return this.subscriptionPlanRepository.save(updatedPlan);
-      } catch (error) {
-        throw new BadRequestException('Failed to update Stripe product for the plan');
-      }
-    }
-
-    return updatedPlan;
+    Object.assign(plan, planData);
+    return this.subscriptionPlanRepository.save(plan);
   }
 
   async deleteSubscriptionPlan(id: string): Promise<void> {
@@ -359,85 +292,115 @@ export class AdminService {
       throw new NotFoundException('Subscription plan not found');
     }
 
-    // Check if plan has any subscriptions
-    const subscriptionCount = await this.subscriptionRepository.count({
-      where: { planId: id },
-    });
-
-    if (subscriptionCount > 0) {
-      throw new BadRequestException('Cannot delete a subscription plan that has associated subscriptions');
-    }
-
-    // Delete Stripe product if it exists
-    if (plan.stripeProductId) {
-      try {
-        await this.stripeService.deleteProduct(plan.stripeProductId);
-      } catch (error) {
-        // Log error but don't fail the deletion
-        console.error('Failed to delete Stripe product:', error);
-      }
-    }
-
     await this.subscriptionPlanRepository.remove(plan);
   }
 
-  async getSubscriptionPlanStats(): Promise<{
-    totalPlans: number;
-    activePlans: number;
-    inactivePlans: number;
-    archivedPlans: number;
-    plansWithSubscriptions: number;
-    mostPopularPlan: {
-      planName: string;
-      subscriptionCount: number;
-    } | null;
+  // Influencer Management
+  async getInfluencers(page: number = 1, limit: number = 10): Promise<{
+    influencers: Influencer[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   }> {
-    const [
-      totalPlans,
-      activePlans,
-      inactivePlans,
-      archivedPlans,
-    ] = await Promise.all([
-      this.subscriptionPlanRepository.count(),
-      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.ACTIVE } }),
-      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.INACTIVE } }),
-      this.subscriptionPlanRepository.count({ where: { status: PlanStatus.ARCHIVED } }),
-    ]);
-
-    // Get plans with subscriptions
-    const plansWithSubscriptions = await this.subscriptionPlanRepository
-      .createQueryBuilder('plan')
-      .leftJoin('plan.subscriptions', 'subscription')
-      .where('subscription.id IS NOT NULL')
-      .getCount();
-
-    // Get most popular plan
-    const mostPopularPlanResult = await this.subscriptionRepository
-      .createQueryBuilder('subscription')
-      .leftJoin('subscription.plan', 'plan')
-      .select('plan.name', 'planName')
-      .addSelect('COUNT(subscription.id)', 'subscriptionCount')
-      .groupBy('plan.id, plan.name')
-      .orderBy('COUNT(subscription.id)', 'DESC')
-      .limit(1)
-      .getRawOne();
+    const [influencers, total] = await this.influencerRepository.findAndCount({
+      relations: ['user', 'promoCodes', 'commissions'],
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
 
     return {
-      totalPlans,
-      activePlans,
-      inactivePlans,
-      archivedPlans,
-      plansWithSubscriptions,
-      mostPopularPlan: mostPopularPlanResult ? {
-        planName: mostPopularPlanResult.planName,
-        subscriptionCount: parseInt(mostPopularPlanResult.subscriptionCount),
-      } : null,
+      influencers,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 
-  private validateAdminAccess(user: User): void {
-    if (user.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Access denied. Admin role required.');
+  async getInfluencerById(id: string): Promise<Influencer> {
+    const influencer = await this.influencerRepository.findOne({
+      where: { id },
+      relations: ['user', 'promoCodes', 'commissions', 'commissions.purchaseRecord'],
+    });
+
+    if (!influencer) {
+      throw new NotFoundException('Influencer not found');
     }
+
+    return influencer;
+  }
+
+  async getInfluencerStats(): Promise<any> {
+    const totalInfluencers = await this.influencerRepository.count();
+    const activeInfluencers = await this.influencerRepository.count({
+      where: { status: InfluencerStatus.ACTIVE },
+    });
+    const pendingInfluencers = await this.influencerRepository.count({
+      where: { status: InfluencerStatus.PENDING },
+    });
+
+    const totalCommissions = await this.commissionRepository
+      .createQueryBuilder('commission')
+      .select('SUM(commission.amount)', 'total')
+      .where('commission.status IN (:...statuses)', { statuses: [CommissionStatus.APPROVED, CommissionStatus.PAID] })
+      .getRawOne();
+
+    const pendingCommissions = await this.commissionRepository
+      .createQueryBuilder('commission')
+      .select('SUM(commission.amount)', 'total')
+      .where('commission.status = :status', { status: CommissionStatus.PENDING })
+      .getRawOne();
+
+    return {
+      totalInfluencers,
+      activeInfluencers,
+      pendingInfluencers,
+      totalCommissions: parseFloat(totalCommissions?.total || '0'),
+      pendingCommissions: parseFloat(pendingCommissions?.total || '0'),
+    };
+  }
+
+  async getCommissions(page: number = 1, limit: number = 10): Promise<{
+    commissions: Commission[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const [commissions, total] = await this.commissionRepository.findAndCount({
+      relations: ['influencer', 'influencer.user', 'purchaseRecord', 'purchaseRecord.user', 'purchaseRecord.plan'],
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      commissions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async updateCommissionStatus(id: string, status: string): Promise<Commission> {
+    const commission = await this.commissionRepository.findOne({
+      where: { id },
+      relations: ['influencer'],
+    });
+
+    if (!commission) {
+      throw new NotFoundException('Commission not found');
+    }
+
+    commission.status = status as any;
+    
+    if (status === 'paid') {
+      commission.paidAt = new Date();
+    }
+
+    return this.commissionRepository.save(commission);
   }
 }

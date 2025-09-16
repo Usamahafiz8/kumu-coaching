@@ -4,29 +4,14 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from 'typeorm';
-import { Subscription } from './subscription.entity';
-
-export enum PlanType {
-  MONTHLY = 'monthly',
-  QUARTERLY = 'quarterly',
-  YEARLY = 'yearly',
-  LIFETIME = 'lifetime',
-}
-
-export enum PlanStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  ARCHIVED = 'archived',
-}
 
 @Entity('subscription_plans')
 export class SubscriptionPlan {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
   @Column({ type: 'text', nullable: true })
@@ -35,38 +20,27 @@ export class SubscriptionPlan {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({
-    type: 'varchar',
-  })
-  type: PlanType;
+  @Column({ type: 'varchar', length: 3, default: 'USD' })
+  currency: string;
 
-  @Column({ type: 'int', default: 1 })
-  durationInMonths: number;
+  @Column({ type: 'varchar', length: 20, default: 'monthly' })
+  interval: string; // monthly, yearly
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  stripePriceId: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  stripeProductId: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
 
   @Column({ type: 'json', nullable: true })
   features: string[];
-
-  @Column({
-    type: 'varchar',
-    default: PlanStatus.ACTIVE,
-  })
-  status: PlanStatus;
-
-  @Column({ default: true })
-  isActive: boolean;
-
-  @Column({ nullable: true })
-  stripePriceId: string;
-
-  @Column({ nullable: true })
-  stripeProductId: string;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @OneToMany(() => Subscription, (subscription) => subscription.plan)
-  subscriptions: Subscription[];
 }

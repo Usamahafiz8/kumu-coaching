@@ -3,20 +3,20 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { User } from '../entities/user.entity';
-import { Subscription } from '../entities/subscription.entity';
+import { EmailTemplate } from '../entities/email-template.entity';
+import { AppConfig } from '../entities/app-config.entity';
+import { PurchaseRecord } from '../entities/purchase-record.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
+import { Influencer } from '../entities/influencer.entity';
+import { Commission } from '../entities/commission.entity';
 import { AuthModule } from '../auth/auth.module';
-import { StripeModule } from '../stripe/stripe.module';
-import { InfluencerModule } from '../influencer/influencer.module';
 import { ConfigModule } from '../config/config.module';
 import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Subscription, SubscriptionPlan]),
+    TypeOrmModule.forFeature([User, EmailTemplate, AppConfig, PurchaseRecord, SubscriptionPlan, Influencer, Commission]),
     AuthModule,
-    StripeModule,
-    InfluencerModule,
     ConfigModule,
     EmailModule,
   ],

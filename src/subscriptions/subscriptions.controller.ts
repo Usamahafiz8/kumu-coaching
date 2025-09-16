@@ -1,11 +1,12 @@
 import {
   Controller,
-  Get,
   Post,
-  Put,
-  Param,
-  UseGuards,
+  Get,
   Body,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
   Query,
 } from '@nestjs/common';
 import {
@@ -13,162 +14,178 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiParam,
-  ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { PurchaseSubscriptionDto } from './dto/purchase-subscription.dto';
-import { CancelSubscriptionDto } from './dto/cancel-subscription.dto';
-import { User } from '../entities/user.entity';
-import { SubscriptionPlan } from '../entities/subscription-plan.entity';
-import { Subscription } from '../entities/subscription.entity';
-import { ApiResponseDto, PaginatedResponseDto } from '../common/dto/api-response.dto';
+import { ApiResponseDto } from '../common/dto/api-response.dto';
+import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
 
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 export class SubscriptionsController {
-  constructor(
-    private readonly subscriptionsService: SubscriptionsService,
-  ) {}
+  constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
-  @Get('plans')
-  @ApiOperation({ summary: 'List all available subscription plans' })
+  @Post('checkout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Create Stripe checkout session for subscription',
+    description: 'Creates a Stripe checkout session for the specified subscription plan. Success and cancel URLs are configured in environment variables.'
+  })
+  @ApiBody({ type: CreateCheckoutSessionDto })
   @ApiResponse({
     status: 200,
-    description: 'Subscription plans retrieved successfully',
-    type: ApiResponseDto,
-  })
-  async getSubscriptionPlans(): Promise<ApiResponseDto<SubscriptionPlan[]>> {
-    const plans = await this.subscriptionsService.getSubscriptionPlans();
-    return new ApiResponseDto(true, 'Subscription plans retrieved successfully', plans);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get details of a specific subscription plan' })
-  @ApiParam({
-    name: 'id',
-    description: 'Subscription plan ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Subscription plan retrieved successfully',
-    type: ApiResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Subscription plan not found',
-  })
-  async getSubscriptionPlanById(
-    @Param('id') id: string,
-  ): Promise<ApiResponseDto<SubscriptionPlan>> {
-    const plan = await this.subscriptionsService.getSubscriptionPlanById(id);
-    return new ApiResponseDto(true, 'Subscription plan retrieved successfully', plan);
-  }
-
-  @Post('purchase')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Purchase/activate a subscription' })
-  @ApiResponse({
-    status: 201,
-    description: 'Subscription purchased successfully',
-    type: ApiResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input data',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Subscription plan not found',
+    description: 'Checkout session created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Checkout session created successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            sessionId: { type: 'string', example: 'cs_test_...' },
+            url: { type: 'string', example: 'https://checkout.stripe.com/...' },
+            purchaseRecordId: { type: 'string', example: 'uuid' },
+            plan: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', example: 'plan-annual' },
+                name: { type: 'string', example: 'Annual Subscription' },
+                originalPrice: { type: 'number', example: 20 },
+                finalPrice: { type: 'number', example: 20 },
+                currency: { type: 'string', example: 'GBP' },
+                interval: { type: 'string', example: 'annually' },
+                discount: { type: 'object', nullable: true }
+              }
+            },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', example: 'uuid' },
+                email: { type: 'string', example: 'user@example.com' },
+                firstName: { type: 'string', example: 'John' },
+                lastName: { type: 'string', example: 'Doe' }
+              }
+            }
+          },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 409,
     description: 'User already has an active subscription',
   })
-  async purchaseSubscription(
-    @CurrentUser() user: User,
-    @Body() purchaseDto: PurchaseSubscriptionDto,
-  ): Promise<ApiResponseDto<Subscription>> {
-    const subscription = await this.subscriptionsService.purchaseSubscription(
-      user.id,
-      purchaseDto,
-    );
-    return new ApiResponseDto(true, 'Subscription purchased successfully', subscription);
-  }
-
-  @Get('status')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get current subscription status' })
-  @ApiResponse({
-    status: 200,
-    description: 'Subscription status retrieved successfully',
-    type: ApiResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized',
-  })
-  async getSubscriptionStatus(@CurrentUser() user: User): Promise<ApiResponseDto> {
-    const status = await this.subscriptionsService.getSubscriptionStatus(user.id);
-    return new ApiResponseDto(true, 'Subscription status retrieved successfully', status);
-  }
-
-  @Get('history')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'List all past subscription purchases/transactions' })
-  @ApiResponse({
-    status: 200,
-    description: 'Subscription history retrieved successfully',
-    type: ApiResponseDto,
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized',
-  })
-  async getSubscriptionHistory(@CurrentUser() user: User): Promise<ApiResponseDto<Subscription[]>> {
-    const history = await this.subscriptionsService.getSubscriptionHistory(user.id);
-    return new ApiResponseDto(true, 'Subscription history retrieved successfully', history);
-  }
-
-  @Put('cancel')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Cancel active subscription' })
-  @ApiResponse({
-    status: 200,
-    description: 'Subscription cancelled successfully',
-    type: ApiResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input data',
-  })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized',
   })
   @ApiResponse({
     status: 404,
-    description: 'No active subscription found',
+    description: 'Subscription plan not found or inactive',
   })
-  async cancelSubscription(
-    @CurrentUser() user: User,
-    @Body() cancelDto: CancelSubscriptionDto,
-  ): Promise<ApiResponseDto<Subscription>> {
-    const subscription = await this.subscriptionsService.cancelSubscription(
-      user.id,
-      cancelDto,
+  async createCheckoutSession(
+    @Request() req,
+    @Body() body: CreateCheckoutSessionDto,
+  ) {
+    const { planId, promoCode } = body;
+    const result = await this.subscriptionsService.createCheckoutSession(
+      req.user.id,
+      planId,
+      promoCode,
     );
-    return new ApiResponseDto(true, 'Subscription cancelled successfully', subscription);
+
+    return new ApiResponseDto(true, 'Checkout session created successfully', result);
   }
+
+
+  @Get('success')
+  @ApiOperation({ summary: 'Handle successful subscription payment' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment success page',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Payment successful! Your subscription is now active.' },
+        data: {
+          type: 'object',
+          properties: {
+            subscriptionId: { type: 'string' },
+            status: { type: 'string', example: 'active' },
+            redirectUrl: { type: 'string', example: 'http://localhost:3001/dashboard' },
+          },
+        },
+      },
+    },
+  })
+  async paymentSuccess(@Request() req, @Query() query: any) {
+    const sessionId = query.session_id as string;
+    
+    if (!sessionId) {
+      return new ApiResponseDto(false, 'Missing session ID', null);
+    }
+
+    try {
+      // Verify payment with Stripe and complete the subscription
+      const result = await this.subscriptionsService.verifyAndCompletePayment(sessionId);
+      
+      if (result.success) {
+        return new ApiResponseDto(true, 'Payment verified and subscription activated!', {
+          subscriptionId: result.subscriptionId,
+          status: 'active',
+          purchaseRecordId: result.purchaseRecordId,
+          redirectUrl: 'http://localhost:3001/dashboard',
+        });
+      } else {
+        return new ApiResponseDto(false, result.message, null);
+      }
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      return new ApiResponseDto(false, 'Failed to verify payment', null);
+    }
+  }
+
+  @Get('cancel')
+  @ApiOperation({ summary: 'Handle cancelled subscription payment' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment cancelled page',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Payment was cancelled. You can try again anytime.' },
+        data: {
+          type: 'object',
+          properties: {
+            redirectUrl: { type: 'string', example: 'http://localhost:3001/subscription' },
+          },
+        },
+      },
+    },
+  })
+  async paymentCancel(@Request() req) {
+    // This endpoint handles cancelled payments from Stripe
+    return new ApiResponseDto(false, 'Payment was cancelled. You can try again anytime.', {
+      redirectUrl: 'http://localhost:3001/subscription',
+    });
+  }
+
+  @Get('purchase-history')
+  @ApiOperation({ summary: 'Get user purchase history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Purchase history retrieved successfully',
+    type: ApiResponseDto,
+  })
+  async getPurchaseHistory(@Request() req) {
+    const purchases = await this.subscriptionsService.getUserPurchaseHistory(req.user.id);
+    return new ApiResponseDto(true, 'Purchase history retrieved successfully', purchases);
+  }
+
 }

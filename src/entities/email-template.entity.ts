@@ -16,6 +16,11 @@ export enum EmailTemplateType {
   PAYMENT_FAILED = 'payment_failed',
   INFLUENCER_INVITATION = 'influencer_invitation',
   COMMISSION_EARNED = 'commission_earned',
+  PASSWORD_CHANGE_VERIFICATION = 'password_change_verification',
+  EMAIL_CHANGE_VERIFICATION = 'email_change_verification',
+  PHONE_CHANGE_VERIFICATION = 'phone_change_verification',
+  PROFILE_UPDATE_VERIFICATION = 'profile_update_verification',
+  ACCOUNT_DELETION_VERIFICATION = 'account_deletion_verification',
   CUSTOM = 'custom',
 }
 
