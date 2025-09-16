@@ -28,7 +28,6 @@ async function bootstrap() {
 
   // Swagger documentation
   const port = process.env.PORT || 3000;
-  const baseUrl = process.env.API_BASE_URL || `http://localhost:${port}`;
   
   const config = new DocumentBuilder()
     .setTitle('Kumu Coaching API')
@@ -45,7 +44,7 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addServer(baseUrl, 'API Server')
+    .addServer('/', 'Current Server') // This will use the current request's base URL
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -75,8 +74,9 @@ async function bootstrap() {
 
   await app.listen(port);
   
-  console.log(`🚀 Application is running on: ${baseUrl}`);
-  console.log(`📚 API Documentation: ${baseUrl}/api/docs`);
+  console.log(`🚀 Application is running on port: ${port}`);
+  console.log(`📚 API Documentation: /api/docs (will use current request's base URL)`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 
 bootstrap();
