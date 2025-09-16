@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import { runSeeds } from '../database/seeds';
 import { User } from '../entities/user.entity';
@@ -6,17 +6,55 @@ import { PasswordReset } from '../entities/password-reset.entity';
 import { PromoCode } from '../entities/promo-code.entity';
 import { AppConfig } from '../entities/app-config.entity';
 import { EmailTemplate } from '../entities/email-template.entity';
+import { Subscription } from '../entities/subscription.entity';
+import { SubscriptionPlan } from '../entities/subscription-plan.entity';
+import { PurchaseRecord } from '../entities/purchase-record.entity';
+import { VerificationCode } from '../entities/verification-code.entity';
+import { Influencer } from '../entities/influencer.entity';
+import { Commission } from '../entities/commission.entity';
 
 // Load environment variables
 config();
 
-const AppDataSource = new DataSource({
-  type: 'sqlite',
-  database: 'kumu_coaching.db',
-  entities: [User, PasswordReset, PromoCode, AppConfig, EmailTemplate],
-  synchronize: true,
-  logging: false,
-});
+// Determine database configuration based on environment
+const isProduction = process.env.NODE_ENV === 'production';
+const usePostgreSQL = process.env.DB_HOST && process.env.DB_NAME;
+
+const entities = [
+  User, 
+  PasswordReset, 
+  PromoCode, 
+  AppConfig, 
+  EmailTemplate,
+  Subscription,
+  SubscriptionPlan,
+  PurchaseRecord,
+  VerificationCode,
+  Influencer,
+  Commission
+];
+
+const AppDataSource = new DataSource(
+  usePostgreSQL 
+    ? {
+        type: 'postgres',
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT || '5432'),
+        username: process.env.DB_USERNAME,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        entities,
+        synchronize: !isProduction,
+        logging: !isProduction,
+      } as DataSourceOptions
+    : {
+        type: 'sqlite',
+        database: 'kumu_coaching.db',
+        entities,
+        synchronize: !isProduction,
+        logging: !isProduction,
+      } as DataSourceOptions
+);
 
 
 

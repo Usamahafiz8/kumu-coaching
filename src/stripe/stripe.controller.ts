@@ -71,6 +71,16 @@ export class StripeController {
     @Headers('stripe-signature') signature: string,
   ) {
     try {
+      if (!body) {
+        this.logger.error('Webhook body is empty');
+        throw new Error('Webhook body is empty');
+      }
+      
+      if (!signature) {
+        this.logger.error('Stripe signature is missing');
+        throw new Error('Stripe signature is missing');
+      }
+
       const event = this.stripeService.constructWebhookEvent(body.toString(), signature);
 
       this.logger.log(`Received Stripe webhook: ${event.type}`);
