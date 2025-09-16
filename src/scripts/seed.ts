@@ -18,8 +18,14 @@ config();
 
 // Determine database configuration based on environment
 const isProduction = process.env.NODE_ENV === 'production';
-// For now, always use SQLite since the app is configured for SQLite
-const usePostgreSQL = false;
+const usePostgreSQL = process.env.DB_HOST && (process.env.DB_DATABASE || process.env.DB_NAME);
+
+console.log('🔍 Debug Info:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('DB_HOST:', process.env.DB_HOST);
+console.log('DB_DATABASE:', process.env.DB_DATABASE);
+console.log('DB_NAME:', process.env.DB_NAME);
+console.log('usePostgreSQL:', usePostgreSQL);
 
 const entities = [
   User, 
@@ -43,10 +49,11 @@ const AppDataSource = new DataSource(
         port: parseInt(process.env.DB_PORT || '5432'),
         username: process.env.DB_USERNAME,
         password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
+        database: process.env.DB_DATABASE || process.env.DB_NAME,
         entities,
         synchronize: !isProduction,
         logging: !isProduction,
+        ssl: { rejectUnauthorized: false },
       } as DataSourceOptions
     : {
         type: 'sqlite',

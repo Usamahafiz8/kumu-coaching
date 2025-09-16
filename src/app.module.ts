@@ -25,7 +25,7 @@ import { VerificationCode } from './entities/verification-code.entity';
 import { Influencer } from './entities/influencer.entity';
 import { Commission } from './entities/commission.entity';
 import { HttpExceptionFilter, AllExceptionsFilter } from './common/filters/http-exception.filter';
-import databaseConfig from './config/database-sqlite.config';
+import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 
 @Module({

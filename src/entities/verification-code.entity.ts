@@ -43,10 +43,10 @@ export class VerificationCode {
   })
   status: VerificationCodeStatus;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   expiresAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   verifiedAt: Date;
 
   @CreateDateColumn()

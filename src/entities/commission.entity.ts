@@ -47,7 +47,7 @@ export class Commission {
   })
   status: CommissionStatus;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   paidAt: Date;
 
   @Column({ type: 'varchar', length: 100, nullable: true })

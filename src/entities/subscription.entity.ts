@@ -53,16 +53,16 @@ export class Subscription {
   })
   status: SubscriptionStatus;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   currentPeriodStart: Date;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   currentPeriodEnd: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   cancelledAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   endedAt: Date;
 
   @CreateDateColumn()

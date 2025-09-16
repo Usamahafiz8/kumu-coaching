@@ -74,7 +74,7 @@ export class PromoCode {
   })
   status: PromoCodeStatus;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date | null;
 
   @Column({ type: 'text', nullable: true })
