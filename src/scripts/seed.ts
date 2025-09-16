@@ -18,7 +18,8 @@ config();
 
 // Determine database configuration based on environment
 const isProduction = process.env.NODE_ENV === 'production';
-const usePostgreSQL = process.env.DB_HOST && process.env.DB_NAME;
+// For now, always use SQLite since the app is configured for SQLite
+const usePostgreSQL = false;
 
 const entities = [
   User, 
