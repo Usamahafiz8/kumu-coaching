@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, BadRequestException } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
@@ -55,7 +55,30 @@ import jwtConfig from './config/jwt.config';
     AppService,
     {
       provide: APP_PIPE,
-      useClass: ValidationPipe,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+        disableErrorMessages: false,
+        validationError: {
+          target: false,
+          value: false,
+        },
+        exceptionFactory: (errors) => {
+          const result = errors.map((error) => ({
+            property: error.property,
+            value: error.value,
+            constraints: error.constraints,
+          }));
+          return new BadRequestException({
+            message: 'Validation failed',
+            errors: result,
+          });
+        },
+      }),
     },
     {
       provide: APP_FILTER,

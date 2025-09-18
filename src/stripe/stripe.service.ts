@@ -65,6 +65,49 @@ export class StripeService {
   }
 
   /**
+   * Create a Stripe coupon
+   */
+  async createCoupon({
+    id,
+    percentOff,
+    amountOff,
+    currency,
+    duration,
+    maxRedemptions,
+    redeemBy,
+  }: {
+    id: string;
+    percentOff?: number;
+    amountOff?: number;
+    currency?: string;
+    duration: 'once' | 'repeating' | 'forever';
+    maxRedemptions?: number;
+    redeemBy?: number;
+  }): Promise<Stripe.Coupon> {
+    const couponData: Stripe.CouponCreateParams = {
+      id,
+      duration,
+    };
+
+    if (percentOff) {
+      couponData.percent_off = percentOff;
+    } else if (amountOff) {
+      couponData.amount_off = Math.round(amountOff * 100); // Convert to cents
+      couponData.currency = currency?.toLowerCase();
+    }
+
+    if (maxRedemptions) {
+      couponData.max_redemptions = maxRedemptions;
+    }
+
+    if (redeemBy) {
+      couponData.redeem_by = redeemBy;
+    }
+
+    return this.stripe.coupons.create(couponData);
+  }
+
+  /**
    * Create a Stripe checkout session
    */
   async createCheckoutSession({

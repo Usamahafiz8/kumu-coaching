@@ -12,11 +12,14 @@ import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { User, UserRole } from '../entities/user.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
+import { PasswordResetCode } from '../entities/password-reset-code.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SendPasswordResetCodeDto } from './dto/send-password-reset-code.dto';
+import { ResetPasswordWithCodeDto } from './dto/reset-password-with-code.dto';
 import { AuthResponseDto } from '../common/dto/auth-response.dto';
 import { EmailService } from '../email/email.service';
 import { VerificationCodesService } from '../verification-codes/verification-codes.service';
@@ -28,6 +31,8 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(PasswordReset)
     private passwordResetRepository: Repository<PasswordReset>,
+    @InjectRepository(PasswordResetCode)
+    private passwordResetCodeRepository: Repository<PasswordResetCode>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
@@ -108,6 +113,81 @@ export class AuthService {
     // No-op since we're not using refresh tokens
   }
 
+
+  async sendPasswordResetCode(sendPasswordResetCodeDto: SendPasswordResetCodeDto): Promise<void> {
+    const { email } = sendPasswordResetCodeDto;
+
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return;
+    }
+
+    // Generate 6-digit reset code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Invalidate any existing reset codes for this user
+    await this.passwordResetCodeRepository.update(
+      { userId: user.id },
+      { isUsed: true }
+    );
+
+    // Save reset code
+    const passwordResetCode = this.passwordResetCodeRepository.create({
+      userId: user.id,
+      code: resetCode,
+      expiresAt,
+    });
+
+    await this.passwordResetCodeRepository.save(passwordResetCode);
+
+    // Send reset code email
+    await this.emailService.sendEmail({
+      to: user.email,
+      subject: 'Password Reset Code - Kumu Coaching',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Password Reset Code</h2>
+          <p>Hello ${user.firstName},</p>
+          <p>You have requested to reset your password for your Kumu Coaching account.</p>
+          <p>Your password reset code is:</p>
+          <div style="background-color: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 5px;">
+            <h1 style="color: #007bff; font-size: 32px; margin: 0; letter-spacing: 5px;">${resetCode}</h1>
+          </div>
+          <p>This code will expire in 15 minutes.</p>
+          <p>If you didn't request this password reset, please ignore this email.</p>
+          <p>Best regards,<br>The Kumu Coaching Team</p>
+        </div>
+      `,
+    });
+  }
+
+  async resetPasswordWithCode(resetPasswordWithCodeDto: ResetPasswordWithCodeDto): Promise<void> {
+    const { code, newPassword } = resetPasswordWithCodeDto;
+
+    // Find valid reset code
+    const resetCode = await this.passwordResetCodeRepository.findOne({
+      where: { code, isUsed: false },
+      relations: ['user'],
+    });
+
+    if (!resetCode || resetCode.isExpired) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    // Update user password
+    const user = resetCode.user;
+    user.password = newPassword;
+    await this.userRepository.save(user);
+
+    // Mark reset code as used
+    resetCode.isUsed = true;
+    await this.passwordResetCodeRepository.save(resetCode);
+  }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<void> {
     const { email } = forgotPasswordDto;

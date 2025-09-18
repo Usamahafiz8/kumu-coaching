@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Subscription, SubscriptionStatus } from '../entities/subscription.entity';
@@ -44,10 +44,21 @@ export class SubscriptionsService {
     planId: string, 
     promoCode?: string
   ) {
-    // Check if user already has an active subscription
-    const existingSubscription = await this.subscriptionRepository.findOne({
-      where: {
-        userId,
+    try {
+      // Validate input parameters
+      if (!userId) {
+        throw new BadRequestException('User ID is required');
+      }
+      if (!planId) {
+        throw new BadRequestException('Plan ID is required');
+      }
+
+      this.logger.log(`Creating checkout session for user ${userId}, plan ${planId}`);
+
+      // Check if user already has an active subscription
+      const existingSubscription = await this.subscriptionRepository.findOne({
+        where: {
+          userId,
         status: SubscriptionStatus.ACTIVE,
       },
     });
@@ -122,21 +133,50 @@ export class SubscriptionsService {
         await this.subscriptionPlanRepository.save(plan);
       }
 
-      // Calculate final price (apply promo code discount if applicable)
-      let finalPrice = plan.price;
-      if (validatedPromoCode && validatedPromoCode.discountType === 'percentage') {
-        finalPrice = plan.price * (1 - validatedPromoCode.discountValue / 100);
-      } else if (validatedPromoCode && validatedPromoCode.discountType === 'fixed') {
-        finalPrice = Math.max(0, plan.price - validatedPromoCode.discountValue);
-      }
-
-      // Create Stripe price
+      // Create Stripe price with original price (discounts will be applied via Stripe coupon)
       const price = await this.stripeService.createPrice({
         productId,
-        amount: finalPrice,
+        amount: plan.price,
         currency: plan.currency,
         interval: plan.interval === 'annually' ? 'year' : 'month',
       });
+
+      // Create Stripe coupon if promo code is provided and doesn't have a Stripe coupon ID
+      let stripeCouponId = validatedPromoCode?.stripeCouponId;
+      if (validatedPromoCode && !stripeCouponId) {
+        try {
+          const couponId = `promo_${validatedPromoCode.code}_${Date.now()}`;
+          const couponData: any = {
+            id: couponId,
+            duration: 'forever',
+          };
+
+          if (validatedPromoCode.discountType === 'percentage') {
+            couponData.percentOff = validatedPromoCode.discountValue;
+          } else {
+            couponData.amountOff = validatedPromoCode.discountValue;
+            couponData.currency = plan.currency.toLowerCase();
+          }
+
+          if (validatedPromoCode.usageLimit > 0) {
+            couponData.maxRedemptions = validatedPromoCode.usageLimit;
+          }
+
+          if (validatedPromoCode.expiresAt) {
+            couponData.redeemBy = Math.floor(validatedPromoCode.expiresAt.getTime() / 1000);
+          }
+
+          const coupon = await this.stripeService.createCoupon(couponData);
+          stripeCouponId = coupon.id;
+
+          // Update promo code with Stripe coupon ID
+          validatedPromoCode.stripeCouponId = stripeCouponId;
+          await this.promoCodeRepository.save(validatedPromoCode);
+        } catch (error) {
+          this.logger.error('Failed to create Stripe coupon:', error);
+          // Continue without discount if coupon creation fails
+        }
+      }
 
       // Create checkout session
       const session = await this.stripeService.createCheckoutSession({
@@ -144,8 +184,18 @@ export class SubscriptionsService {
         priceId: price.id,
         successUrl,
         cancelUrl,
-        discountCode: validatedPromoCode?.stripeCouponId, // Use Stripe coupon ID if available
+        discountCode: stripeCouponId,
       });
+
+      // Calculate expected final price for tracking (Stripe will apply the actual discount)
+      let expectedFinalPrice = plan.price;
+      if (validatedPromoCode) {
+        if (validatedPromoCode.discountType === 'percentage') {
+          expectedFinalPrice = plan.price * (1 - validatedPromoCode.discountValue / 100);
+        } else {
+          expectedFinalPrice = Math.max(0, plan.price - validatedPromoCode.discountValue);
+        }
+      }
 
       // Create purchase record to track this transaction
       const purchaseRecord = this.purchaseRecordRepository.create({
@@ -157,8 +207,8 @@ export class SubscriptionsService {
         stripePriceId: price.id,
         stripeProductId: productId,
         originalPrice: plan.price,
-        finalPrice: finalPrice,
-        discountAmount: plan.price - finalPrice,
+        finalPrice: expectedFinalPrice,
+        discountAmount: plan.price - expectedFinalPrice,
         currency: plan.currency,
         status: PurchaseStatus.PENDING,
         notes: `Stripe checkout session created for ${plan.name}${validatedPromoCode ? ` with promo code ${validatedPromoCode.code}` : ''}`,
@@ -176,7 +226,7 @@ export class SubscriptionsService {
           id: plan.id,
           name: plan.name,
           originalPrice: plan.price,
-          finalPrice: finalPrice,
+          finalPrice: expectedFinalPrice,
           currency: plan.currency,
           interval: plan.interval,
           discount: validatedPromoCode ? {
@@ -196,6 +246,13 @@ export class SubscriptionsService {
     } catch (error) {
       this.logger.error('Failed to create checkout session:', error);
       throw new Error('Failed to create checkout session');
+    }
+    } catch (error) {
+      if (error instanceof ConflictException || error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to create checkout session for user ${userId}`, error.stack);
+      throw new BadRequestException('Failed to create checkout session');
     }
   }
 
@@ -300,6 +357,7 @@ export class SubscriptionsService {
         userId,
         status: SubscriptionStatus.ACTIVE,
       },
+      relations: ['plan'],
     });
   }
 
@@ -392,16 +450,6 @@ export class SubscriptionsService {
     this.logger.log(`Payment failed for user ${purchaseRecord.user.email}. Reason: ${reason}`);
   }
 
-  /**
-   * Get user's purchase history
-   */
-  async getUserPurchaseHistory(userId: string): Promise<PurchaseRecord[]> {
-    return this.purchaseRecordRepository.find({
-      where: { userId },
-      relations: ['plan', 'promoCode'],
-      order: { createdAt: 'DESC' },
-    });
-  }
 
 
   /**

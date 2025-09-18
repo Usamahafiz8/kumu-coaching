@@ -20,21 +20,55 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
 
     const errorResponse = exception.getResponse();
-    const message = typeof errorResponse === 'string' 
-      ? errorResponse 
-      : (errorResponse as any).message || 'Internal server error';
+    let message = 'Internal server error';
+    let validationErrors = null;
+
+    if (typeof errorResponse === 'string') {
+      message = errorResponse;
+    } else if (typeof errorResponse === 'object' && errorResponse !== null) {
+      const errorObj = errorResponse as any;
+      
+      // Handle validation errors
+      if (Array.isArray(errorObj.message)) {
+        message = 'Validation failed';
+        validationErrors = errorObj.message;
+      } else if (errorObj.message) {
+        message = errorObj.message;
+      }
+      
+      // Handle specific error types
+      if (errorObj.error) {
+        message = errorObj.error;
+      }
+    }
+
+    const errorDetails: any = {};
+    if (validationErrors) {
+      errorDetails.validationErrors = validationErrors;
+    }
+    if (process.env.NODE_ENV === 'development') {
+      errorDetails.details = errorResponse;
+      errorDetails.stack = exception.stack;
+    }
 
     const apiResponse = new ApiResponseDto(
       false,
       message,
       null,
-      process.env.NODE_ENV === 'development' ? errorResponse : undefined,
+      Object.keys(errorDetails).length > 0 ? errorDetails : undefined,
     );
 
-    this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${message}`,
-      exception.stack,
-    );
+    // Log with appropriate level based on status
+    if (status >= 500) {
+      this.logger.error(
+        `${request.method} ${request.url} - ${status} - ${message}`,
+        exception.stack,
+      );
+    } else {
+      this.logger.warn(
+        `${request.method} ${request.url} - ${status} - ${message}`,
+      );
+    }
 
     response.status(status).json(apiResponse);
   }
@@ -49,14 +83,43 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status = HttpStatus.INTERNAL_SERVER_ERROR;
-    const message = 'Internal server error';
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
+    let errorDetails: any = null;
+
+    // Handle different types of exceptions
+    if (exception instanceof Error) {
+      message = exception.message;
+      
+      // Handle specific error types
+      if (exception.name === 'ValidationError') {
+        status = HttpStatus.BAD_REQUEST;
+        message = 'Validation failed';
+      } else if (exception.name === 'CastError') {
+        status = HttpStatus.BAD_REQUEST;
+        message = 'Invalid data format';
+      } else if (exception.name === 'MongoError' || exception.name === 'MongooseError') {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = 'Database error';
+      } else if (exception.name === 'TypeORMError') {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = 'Database error';
+      }
+      
+      errorDetails = process.env.NODE_ENV === 'development' ? {
+        name: exception.name,
+        message: exception.message,
+        stack: exception.stack,
+      } : null;
+    } else {
+      errorDetails = process.env.NODE_ENV === 'development' ? exception : null;
+    }
 
     const apiResponse = new ApiResponseDto(
       false,
       message,
       null,
-      process.env.NODE_ENV === 'development' ? exception : undefined,
+      errorDetails,
     );
 
     this.logger.error(

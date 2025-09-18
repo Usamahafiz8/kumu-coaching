@@ -21,6 +21,8 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SendPasswordResetCodeDto } from './dto/send-password-reset-code.dto';
+import { ResetPasswordWithCodeDto } from './dto/reset-password-with-code.dto';
 import { AuthResponseDto } from '../common/dto/auth-response.dto';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 
@@ -83,6 +85,46 @@ export class AuthController {
     return new ApiResponseDto(true, 'Logout successful');
   }
 
+
+  @Post('send-password-reset-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send password reset code via email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset code sent if user exists',
+    type: ApiResponseDto,
+  })
+  async sendPasswordResetCode(
+    @Body() sendPasswordResetCodeDto: SendPasswordResetCodeDto,
+  ): Promise<ApiResponseDto> {
+    await this.authService.sendPasswordResetCode(sendPasswordResetCodeDto);
+    return new ApiResponseDto(
+      true,
+      'If the email exists, a password reset code has been sent',
+    );
+  }
+
+  @Post('reset-password-with-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using code and new password' })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successfully',
+    type: ApiResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid or expired reset code',
+  })
+  async resetPasswordWithCode(
+    @Body() resetPasswordWithCodeDto: ResetPasswordWithCodeDto,
+  ): Promise<ApiResponseDto> {
+    await this.authService.resetPasswordWithCode(resetPasswordWithCodeDto);
+    return new ApiResponseDto(
+      true,
+      'Password reset successfully',
+    );
+  }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)

@@ -12,6 +12,7 @@ import {
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
 import { PasswordReset } from './password-reset.entity';
+import { PasswordResetCode } from './password-reset-code.entity';
 import { VerificationCode } from './verification-code.entity';
 import { Subscription } from './subscription.entity';
 
@@ -79,6 +80,9 @@ export class User {
 
   @OneToMany(() => PasswordReset, (passwordReset) => passwordReset.user)
   passwordResets: PasswordReset[];
+
+  @OneToMany(() => PasswordResetCode, (passwordResetCode) => passwordResetCode.user)
+  passwordResetCodes: PasswordResetCode[];
 
   @OneToMany(() => VerificationCode, (verificationCode) => verificationCode.user)
   verificationCodes: VerificationCode[];

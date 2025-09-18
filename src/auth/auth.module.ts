@@ -8,12 +8,13 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User } from '../entities/user.entity';
 import { PasswordReset } from '../entities/password-reset.entity';
+import { PasswordResetCode } from '../entities/password-reset-code.entity';
 import { EmailModule } from '../email/email.module';
 import { VerificationCodesModule } from '../verification-codes/verification-codes.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, PasswordReset]),
+    TypeOrmModule.forFeature([User, PasswordReset, PasswordResetCode]),
     PassportModule,
     EmailModule,
     VerificationCodesModule,

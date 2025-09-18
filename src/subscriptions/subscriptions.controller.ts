@@ -176,16 +176,68 @@ export class SubscriptionsController {
     });
   }
 
-  @Get('purchase-history')
-  @ApiOperation({ summary: 'Get user purchase history' })
+  @Get('status')
+  @ApiOperation({ summary: 'Get user subscription status' })
   @ApiResponse({
     status: 200,
-    description: 'Purchase history retrieved successfully',
-    type: ApiResponseDto,
+    description: 'Subscription status retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Subscription status retrieved successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            isSubscribed: { type: 'boolean', example: true },
+            haveSubscription: { type: 'boolean', example: true },
+            subscription: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', example: 'uuid' },
+                status: { type: 'string', example: 'active' },
+                currentPeriodStart: { type: 'string', format: 'date-time' },
+                currentPeriodEnd: { type: 'string', format: 'date-time' },
+                plan: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', example: 'uuid' },
+                    name: { type: 'string', example: 'Annual Coaching Plan' },
+                    price: { type: 'number', example: 20.00 },
+                    currency: { type: 'string', example: 'GBP' },
+                    interval: { type: 'string', example: 'yearly' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   })
-  async getPurchaseHistory(@Request() req) {
-    const purchases = await this.subscriptionsService.getUserPurchaseHistory(req.user.id);
-    return new ApiResponseDto(true, 'Purchase history retrieved successfully', purchases);
+  async getSubscriptionStatus(@Request() req) {
+    const subscription = await this.subscriptionsService.getUserSubscription(req.user.id);
+    const isSubscribed = subscription && subscription.status === 'active';
+    
+    return new ApiResponseDto(true, 'Subscription status retrieved successfully', {
+      isSubscribed,
+      haveSubscription: isSubscribed,
+      subscription: subscription ? {
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        plan: subscription.plan ? {
+          id: subscription.plan.id,
+          name: subscription.plan.name,
+          price: subscription.plan.price,
+          currency: subscription.plan.currency,
+          interval: subscription.plan.interval
+        } : null
+      } : null
+    });
   }
+
 
 }

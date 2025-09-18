@@ -8,6 +8,7 @@ export class RegisterDto {
     example: 'john.doe@example.com',
   })
   @IsEmail({}, { message: 'Please provide a valid email address' })
+  @MaxLength(100, { message: 'Email must not exceed 100 characters' })
   email: string;
 
   @ApiProperty({
@@ -49,9 +50,10 @@ export class RegisterDto {
     example: '+1234567890',
     required: false,
   })
-  @IsString()
+  @IsString({ message: 'Phone number must be a string' })
+  @IsOptional()
   @Matches(/^\+?[1-9]\d{1,14}$/, {
-    message: 'Please provide a valid phone number',
+    message: 'Please provide a valid phone number (e.g., +1234567890)',
   })
   phone?: string;
 

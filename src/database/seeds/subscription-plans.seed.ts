@@ -1,15 +1,8 @@
 import { DataSource } from 'typeorm';
-import { SubscriptionPlan } from '../entities/subscription-plan.entity';
+import { SubscriptionPlan } from '../../entities/subscription-plan.entity';
 
 export async function seedSubscriptionPlans(dataSource: DataSource) {
   const subscriptionPlanRepository = dataSource.getRepository(SubscriptionPlan);
-
-  // Check if plans already exist
-  const existingPlans = await subscriptionPlanRepository.count();
-  if (existingPlans > 0) {
-    console.log('Subscription plans already exist, skipping seed...');
-    return;
-  }
 
   const plans = [
     {
@@ -29,14 +22,21 @@ export async function seedSubscriptionPlans(dataSource: DataSource) {
       stripePriceId: 'price_annual_coaching',
       stripeProductId: 'prod_coaching',
       isActive: true,
+      sortOrder: 1
     }
   ];
 
   for (const planData of plans) {
-    const plan = subscriptionPlanRepository.create(planData);
-    await subscriptionPlanRepository.save(plan);
-    console.log(`Created subscription plan: ${plan.name}`);
-  }
+    const existingPlan = await subscriptionPlanRepository.findOne({
+      where: { name: planData.name },
+    });
 
-  console.log('Subscription plans seeded successfully!');
+    if (!existingPlan) {
+      const newPlan = subscriptionPlanRepository.create(planData);
+      await subscriptionPlanRepository.save(newPlan);
+      console.log(`✅ Created subscription plan: ${planData.name} - $${planData.price}/${planData.interval}`);
+    } else {
+      console.log(`⏭️  Subscription plan already exists: ${planData.name}`);
+    }
+  }
 }
