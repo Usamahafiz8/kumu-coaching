@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -35,10 +36,41 @@ async function bootstrap() {
     }
   });
 
+  // Swagger Configuration
+  const config = new DocumentBuilder()
+    .setTitle('Kumu Coaching API')
+    .setDescription('Comprehensive API for Kumu Coaching platform with user management, products, payments, and subscriptions')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .addTag('Authentication', 'User authentication and authorization')
+    .addTag('Users', 'User profile management')
+    .addTag('Products', 'Product management')
+    .addTag('Stripe', 'Payment processing with Stripe')
+    .addTag('Subscriptions', 'Subscription management')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+
   const configService = app.get(ConfigService);
   const port = configService.get('PORT') || 3000;
   
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`Swagger documentation available at: http://localhost:${port}/api/docs`);
 }
 bootstrap();
