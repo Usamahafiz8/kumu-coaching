@@ -219,10 +219,13 @@ export class SubscriptionsController {
   async getSubscriptionStatus(@Request() req) {
     const subscription = await this.subscriptionsService.getUserSubscription(req.user.id);
     const isSubscribed = subscription ? subscription.status === 'active' : false;
+    const hasSubscription = !!subscription;
     
     return new ApiResponseDto(true, 'Subscription status retrieved successfully', {
       isSubscribed,
       haveSubscription: isSubscribed,
+      hasActiveSubscription: isSubscribed,
+      hasAnySubscription: hasSubscription,
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,
@@ -235,7 +238,7 @@ export class SubscriptionsController {
           currency: subscription.plan.currency,
           interval: subscription.plan.interval
         } : null
-      } : null
+      } : false
     });
   }
 
