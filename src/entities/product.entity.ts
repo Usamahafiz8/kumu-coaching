@@ -6,22 +6,22 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ type: 'varchar' })
   name: string;
 
-  @Column('text')
+  @Column({ type: 'text' })
   description: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column()
+  @Column({ type: 'varchar' })
   currency: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   stripePriceId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   stripeProductId: string;
 
   @Column({ default: true })
@@ -30,10 +30,10 @@ export class Product {
   @Column({ default: false })
   isSubscription: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   billingInterval: string; // 'month', 'year', etc.
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   trialPeriodDays: number;
 
   @CreateDateColumn()

@@ -16,16 +16,16 @@ export class Subscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({ type: 'varchar' })
   userId: string;
 
-  @Column()
+  @Column({ type: 'varchar' })
   productId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   stripeSubscriptionId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   stripeCustomerId: string;
 
   @Column({

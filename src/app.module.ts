@@ -34,7 +34,7 @@ import { Subscription } from './entities/subscription.entity';
         database: configService.get('DB_DATABASE'),
         entities: [User, Product, Subscription],
         synchronize: configService.get('NODE_ENV') === 'development',
-        ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
+        ssl:  { rejectUnauthorized: false },
       }),
       inject: [ConfigService],
     }),
