@@ -218,7 +218,7 @@ export class SubscriptionsController {
   })
   async getSubscriptionStatus(@Request() req) {
     const subscription = await this.subscriptionsService.getUserSubscription(req.user.id);
-    const isSubscribed = subscription && subscription.status === 'active';
+    const isSubscribed = subscription ? subscription.status === 'active' : false;
     
     return new ApiResponseDto(true, 'Subscription status retrieved successfully', {
       isSubscribed,
