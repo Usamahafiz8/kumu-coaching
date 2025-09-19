@@ -73,14 +73,6 @@ export class ResetPasswordDto {
   code: string;
 
   @ApiProperty({
-    description: 'User email address',
-    example: 'user@example.com',
-    format: 'email'
-  })
-  @IsEmail()
-  email: string;
-
-  @ApiProperty({
     description: 'New password (minimum 6 characters)',
     example: 'newpassword123',
     minLength: 6

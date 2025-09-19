@@ -90,11 +90,10 @@ export class AuthService {
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
-    const { code, email, password } = resetPasswordDto;
+    const { code, password } = resetPasswordDto;
 
     const user = await this.userRepository.findOne({
       where: {
-        email,
         passwordResetCode: code,
       },
     });
