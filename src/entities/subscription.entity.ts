@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from './user.entity';
-import { Product } from './product.entity';
 
 export enum SubscriptionStatus {
   ACTIVE = 'active',
@@ -27,6 +26,15 @@ export class Subscription {
 
   @Column({ type: 'varchar', nullable: true })
   stripeCustomerId: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  stripePaymentIntentId: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  amount: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  currency: string;
 
   @Column({
     type: 'enum',
@@ -57,7 +65,7 @@ export class Subscription {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @ManyToOne(() => Product, product => product.subscriptions)
-  @JoinColumn({ name: 'productId' })
-  product: Product;
+  // @ManyToOne(() => Product, product => product.subscriptions)
+  // @JoinColumn({ name: 'productId' })
+  // product: Product;
 }

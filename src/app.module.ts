@@ -10,9 +10,11 @@ import { EmailModule } from './email/email.module';
 import { ProductsModule } from './products/products.module';
 import { StripeModule } from './stripe/stripe.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { AdminModule } from './admin/admin.module';
 import { User } from './entities/user.entity';
 import { Product } from './entities/product.entity';
 import { Subscription } from './entities/subscription.entity';
+import { PromoCode } from './entities/promo-code.entity';
 
 @Module({
   imports: [
@@ -32,7 +34,7 @@ import { Subscription } from './entities/subscription.entity';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_DATABASE'),
-        entities: [User, Product, Subscription],
+        entities: [User, Product, Subscription, PromoCode],
         synchronize: configService.get('NODE_ENV') === 'development',
         ssl:  { rejectUnauthorized: false },
       }),
@@ -44,6 +46,7 @@ import { Subscription } from './entities/subscription.entity';
     ProductsModule,
     StripeModule,
     SubscriptionsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

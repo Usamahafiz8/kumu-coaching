@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { Subscription } from './subscription.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('products')
 export class Product {
@@ -41,7 +40,4 @@ export class Product {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @OneToMany(() => Subscription, subscription => subscription.product)
-  subscriptions: Subscription[];
 }

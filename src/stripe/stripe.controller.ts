@@ -1,12 +1,16 @@
 import { Controller, Post, Body, UseGuards, Request, Headers, Req, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiHeader, ApiQuery } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { StripeService } from './stripe.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Stripe')
 @Controller('stripe')
 export class StripeController {
-  constructor(private stripeService: StripeService) {}
+  constructor(
+    private stripeService: StripeService,
+    private configService: ConfigService,
+  ) {}
 
   @ApiOperation({ summary: 'Create Stripe checkout session' })
   @ApiResponse({ status: 200, description: 'Checkout session created successfully', schema: { properties: { url: { type: 'string', example: 'https://checkout.stripe.com/pay/cs_test_...' } } } })
@@ -25,8 +29,28 @@ export class StripeController {
   @ApiResponse({ status: 400, description: 'Bad request - invalid session' })
   @ApiQuery({ name: 'session_id', description: 'Stripe checkout session ID' })
   @Get('success')
-  async handleSuccess(@Query('session_id') sessionId: string) {
-    return this.stripeService.handleCheckoutSuccess(sessionId);
+  async handleSuccess(@Query('session_id') sessionId: string, @Req() req: any) {
+    try {
+      // Process the subscription
+      await this.stripeService.handleCheckoutSuccess(sessionId);
+      
+      // Redirect to frontend success page using environment variable
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3003';
+      req.res.redirect(`${frontendUrl}/success?session_id=${sessionId}`);
+    } catch (error) {
+      // Redirect to frontend with error using environment variable
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3003';
+      req.res.redirect(`${frontendUrl}/cancel?error=${encodeURIComponent(error.message)}`);
+    }
+  }
+
+  @ApiOperation({ summary: 'Verify payment and get subscription details' })
+  @ApiResponse({ status: 200, description: 'Payment verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid session ID' })
+  @ApiQuery({ name: 'session_id', description: 'Stripe checkout session ID' })
+  @Get('verify-payment')
+  async verifyPayment(@Query('session_id') sessionId: string) {
+    return this.stripeService.verifyPayment(sessionId);
   }
 
   @ApiOperation({ summary: 'Handle Stripe webhook events' })

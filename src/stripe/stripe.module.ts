@@ -5,6 +5,8 @@ import { StripeService } from './stripe.service';
 import { StripeController } from './stripe.controller';
 import { ProductsModule } from '../products/products.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { UsersModule } from '../users/users.module';
+import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 import { Product } from '../entities/product.entity';
 import { Subscription } from '../entities/subscription.entity';
 
@@ -13,7 +15,9 @@ import { Subscription } from '../entities/subscription.entity';
     ConfigModule, 
     TypeOrmModule.forFeature([Product, Subscription]),
     ProductsModule, 
-    SubscriptionsModule
+    SubscriptionsModule,
+    UsersModule,
+    PromoCodesModule
   ],
   providers: [StripeService],
   controllers: [StripeController],

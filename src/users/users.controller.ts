@@ -3,12 +3,16 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nes
 import { UsersService } from './users.service';
 import { UpdateProfileDto, UserResponseDto } from '../dto/user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @ApiTags('Users')
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private subscriptionsService: SubscriptionsService,
+  ) {}
 
   @ApiOperation({ summary: 'Get user profile' })
   @ApiResponse({ status: 200, description: 'User profile retrieved', type: UserResponseDto })
@@ -28,5 +32,14 @@ export class UsersController {
   @Put('profile')
   async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user.id, updateProfileDto);
+  }
+
+  @ApiOperation({ summary: 'Get user subscription status' })
+  @ApiResponse({ status: 200, description: 'Subscription status retrieved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBearerAuth('JWT-auth')
+  @Get('subscription')
+  async getSubscriptionStatus(@Request() req) {
+    return this.subscriptionsService.getSubscriptionStatus(req.user.id);
   }
 }

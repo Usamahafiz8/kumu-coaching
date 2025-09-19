@@ -9,8 +9,10 @@ async function bootstrap() {
   
   // Enable CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Global validation pipe
@@ -67,7 +69,7 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService);
-  const port = configService.get('PORT') || 3000;
+  const port = configService.get('PORT') || 3005;
   
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);

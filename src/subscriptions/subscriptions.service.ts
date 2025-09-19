@@ -34,6 +34,31 @@ export class SubscriptionsService {
     return this.subscriptionRepository.save(subscription);
   }
 
+  async createOneTimeSubscription(
+    userId: string, 
+    productId: string, 
+    paymentIntentId: string, 
+    startDate: Date, 
+    endDate: Date
+  ): Promise<Subscription> {
+    const user = await this.usersService.findById(userId);
+    const product = this.productsService.getSubscriptionProduct();
+
+    const subscription = this.subscriptionRepository.create({
+      userId,
+      productId: product.id, // This will be stored as a string, not a foreign key
+      stripePaymentIntentId: paymentIntentId,
+      amount: product.price,
+      currency: product.currency,
+      status: SubscriptionStatus.ACTIVE,
+      currentPeriodStart: startDate,
+      currentPeriodEnd: endDate,
+      cancelAtPeriodEnd: false,
+    });
+
+    return this.subscriptionRepository.save(subscription);
+  }
+
   async updateFromStripe(stripeSubscription: Stripe.Subscription): Promise<void> {
     const subscription = await this.subscriptionRepository.findOne({
       where: { stripeSubscriptionId: stripeSubscription.id },
@@ -68,7 +93,7 @@ export class SubscriptionsService {
   async getUserSubscriptions(userId: string): Promise<Subscription[]> {
     return this.subscriptionRepository.find({
       where: { userId },
-      relations: ['product'],
+      // relations: ['product'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -79,7 +104,15 @@ export class SubscriptionsService {
         userId,
         status: SubscriptionStatus.ACTIVE,
       },
-      relations: ['product'],
+      // relations: ['product'],
+    });
+  }
+
+  async findByUserId(userId: string): Promise<Subscription | null> {
+    return this.subscriptionRepository.findOne({
+      where: { userId },
+      // relations: ['product'],
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -104,6 +137,49 @@ export class SubscriptionsService {
     await this.subscriptionRepository.save(subscription);
 
     return { message: 'Subscription will be canceled at the end of the current period' };
+  }
+
+  async getSubscriptionStatistics(): Promise<{
+    totalSubscriptions: number;
+    activeSubscriptions: number;
+    canceledSubscriptions: number;
+    totalRevenue: number;
+    recentSubscriptions: Subscription[];
+  }> {
+    const [totalSubscriptions, activeSubscriptions, canceledSubscriptions, recentSubscriptions, allSubscriptions] = await Promise.all([
+      this.subscriptionRepository.count(),
+      this.subscriptionRepository.count({ where: { status: SubscriptionStatus.ACTIVE } }),
+      this.subscriptionRepository.count({ where: { status: SubscriptionStatus.CANCELED } }),
+      this.subscriptionRepository.find({
+        // relations: ['product'],
+        order: { createdAt: 'DESC' },
+        take: 10,
+      }),
+      this.subscriptionRepository.find({
+        where: { status: SubscriptionStatus.ACTIVE },
+        select: ['amount', 'currency'],
+      }),
+    ]);
+
+    // Calculate total revenue from active subscriptions
+    const totalRevenue = allSubscriptions.reduce((sum, sub) => {
+      return sum + (sub.amount || 0);
+    }, 0);
+
+    return {
+      totalSubscriptions,
+      activeSubscriptions,
+      canceledSubscriptions,
+      totalRevenue,
+      recentSubscriptions,
+    };
+  }
+
+  async getAllSubscriptions(): Promise<Subscription[]> {
+    return this.subscriptionRepository.find({
+      // relations: ['product'],
+      order: { createdAt: 'DESC' },
+    });
   }
 
   private mapStripeStatus(stripeStatus: string): SubscriptionStatus {

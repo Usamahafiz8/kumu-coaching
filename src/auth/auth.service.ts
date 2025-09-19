@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../entities/user.entity';
 import { SignUpDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from '../dto/auth.dto';
+import { AdminLoginDto, AdminSignUpDto, AdminProfileDto } from '../dto/admin.dto';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
@@ -139,5 +140,107 @@ export class AuthService {
       return result;
     }
     return null;
+  }
+
+  // Admin-specific methods
+  async adminLogin(adminLoginDto: AdminLoginDto): Promise<{ user: User; token: string }> {
+    const { email, password } = adminLoginDto;
+
+    // Find user with admin role
+    const user = await this.userRepository.findOne({ 
+      where: { email, role: 'admin' } 
+    });
+    
+    if (!user) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    // Check password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    // Generate JWT token with admin role
+    const token = this.jwtService.sign({ 
+      sub: user.id, 
+      email: user.email, 
+      role: user.role 
+    });
+
+    return { user, token };
+  }
+
+  async adminSignUp(adminSignUpDto: AdminSignUpDto): Promise<{ user: User; token: string }> {
+    const { email, password, firstName, lastName } = adminSignUpDto;
+
+    // Check if admin already exists
+    const existingAdmin = await this.userRepository.findOne({ where: { email } });
+    if (existingAdmin) {
+      throw new BadRequestException('Admin with this email already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create admin user
+    const admin = this.userRepository.create({
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      role: 'admin',
+      isEmailVerified: true, // Auto-verify admin emails
+    });
+
+    const savedAdmin = await this.userRepository.save(admin);
+
+    // Generate JWT token
+    const token = this.jwtService.sign({ 
+      sub: savedAdmin.id, 
+      email: savedAdmin.email, 
+      role: savedAdmin.role 
+    });
+
+    return { user: savedAdmin, token };
+  }
+
+  async updateAdminProfile(adminId: string, updateData: Partial<AdminProfileDto>): Promise<{ message: string; user: User }> {
+    const admin = await this.userRepository.findOne({ where: { id: adminId, role: 'admin' } });
+    
+    if (!admin) {
+      throw new BadRequestException('Admin not found');
+    }
+
+    // Update allowed fields
+    if (updateData.firstName) admin.firstName = updateData.firstName;
+    if (updateData.lastName) admin.lastName = updateData.lastName;
+    if (updateData.email) admin.email = updateData.email;
+
+    const updatedAdmin = await this.userRepository.save(admin);
+    
+    return { 
+      message: 'Admin profile updated successfully', 
+      user: updatedAdmin 
+    };
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return this.userRepository.find({
+      select: ['id', 'email', 'firstName', 'lastName', 'role', 'isEmailVerified', 'createdAt', 'updatedAt']
+    });
+  }
+
+  async getUserById(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({ 
+      where: { id: userId },
+      select: ['id', 'email', 'firstName', 'lastName', 'role', 'isEmailVerified', 'createdAt', 'updatedAt']
+    });
+    
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    
+    return user;
   }
 }
