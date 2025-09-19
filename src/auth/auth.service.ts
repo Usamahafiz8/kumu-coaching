@@ -71,41 +71,42 @@ export class AuthService {
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       // Don't reveal if user exists or not
-      return { message: 'If an account with that email exists, we sent a password reset link.' };
+      return { message: 'If an account with that email exists, we sent a verification code.' };
     }
 
-    // Generate reset token
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+    // Generate 6-digit verification code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetExpires = new Date(Date.now() + 600000); // 10 minutes
 
-    // Save reset token
-    user.passwordResetToken = resetToken;
-    user.passwordResetExpires = resetExpires;
+    // Save reset code
+    user.passwordResetCode = resetCode;
+    user.passwordResetCodeExpires = resetExpires;
     await this.userRepository.save(user);
 
-    // Send email
-    await this.emailService.sendPasswordResetEmail(email, resetToken);
+    // Send email with verification code
+    await this.emailService.sendPasswordResetCode(email, resetCode);
 
-    return { message: 'If an account with that email exists, we sent a password reset link.' };
+    return { message: 'If an account with that email exists, we sent a verification code.' };
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
-    const { token, password } = resetPasswordDto;
+    const { code, email, password } = resetPasswordDto;
 
     const user = await this.userRepository.findOne({
       where: {
-        passwordResetToken: token,
+        email,
+        passwordResetCode: code,
       },
     });
 
-    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
-      throw new BadRequestException('Invalid or expired reset token');
+    if (!user || !user.passwordResetCodeExpires || user.passwordResetCodeExpires < new Date()) {
+      throw new BadRequestException('Invalid or expired verification code');
     }
 
     // Update password
     user.password = await bcrypt.hash(password, 12);
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
+    user.passwordResetCode = null;
+    user.passwordResetCodeExpires = null;
     await this.userRepository.save(user);
 
     return { message: 'Password has been reset successfully' };

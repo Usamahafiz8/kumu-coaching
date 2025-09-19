@@ -19,36 +19,65 @@ export class StripeService {
   }
 
   async createCheckoutSession(productId: string, userId: string): Promise<{ url: string }> {
-    const product = await this.productsService.findOne(productId);
+    // Use hardcoded subscription product
+    const product = this.productsService.getSubscriptionProduct();
     
     const session = await this.stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: product.currency.toLowerCase(),
-            product_data: {
-              name: product.name,
-              description: product.description,
-            },
-            unit_amount: Math.round(product.price * 100), // Convert to cents
-            recurring: product.isSubscription ? {
-              interval: product.billingInterval as any,
-            } : undefined,
-          },
+          price: product.stripePriceId, // Use existing Stripe price
           quantity: 1,
         },
       ],
-      mode: product.isSubscription ? 'subscription' : 'payment',
+      mode: 'subscription',
       success_url: `${this.configService.get<string>('SUBSCRIPTION_SUCCESS_URL')}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: this.configService.get<string>('SUBSCRIPTION_CANCEL_URL'),
       metadata: {
         userId,
-        productId,
+        productId: product.id,
       },
     });
 
     return { url: session.url || '' };
+  }
+
+  async handleCheckoutSuccess(sessionId: string): Promise<{ message: string; subscription?: any }> {
+    try {
+      // Retrieve the checkout session from Stripe
+      const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription', 'customer']
+      });
+
+      if (!session.metadata) {
+        throw new Error('Invalid session metadata');
+      }
+
+      const { userId, productId } = session.metadata;
+
+      if (session.payment_status === 'paid' && session.subscription) {
+        // Create subscription in our database
+        const subscription = await this.subscriptionsService.createFromStripe(
+          userId, 
+          productId, 
+          session.subscription as Stripe.Subscription
+        );
+
+        return {
+          message: 'Subscription activated successfully! Welcome to Kumu Coaching Premium.',
+          subscription: {
+            id: subscription.id,
+            status: subscription.status,
+            currentPeriodStart: subscription.currentPeriodStart,
+            currentPeriodEnd: subscription.currentPeriodEnd
+          }
+        };
+      } else {
+        throw new Error('Payment not completed');
+      }
+    } catch (error) {
+      throw new Error(`Failed to process subscription: ${error.message}`);
+    }
   }
 
   async createCustomer(email: string, name?: string): Promise<Stripe.Customer> {

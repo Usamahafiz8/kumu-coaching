@@ -35,6 +35,12 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   passwordResetExpires: Date | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  passwordResetCode: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetCodeExpires: Date | null;
+
   @Column({ type: 'varchar', default: 'user' })
   role: string;
 

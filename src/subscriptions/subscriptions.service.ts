@@ -17,11 +17,12 @@ export class SubscriptionsService {
 
   async createFromStripe(userId: string, productId: string, stripeSubscription: Stripe.Subscription): Promise<Subscription> {
     const user = await this.usersService.findById(userId);
-    const product = await this.productsService.findOne(productId);
+    // Use hardcoded product instead of database lookup
+    const product = this.productsService.getSubscriptionProduct();
 
     const subscription = this.subscriptionRepository.create({
       userId,
-      productId,
+      productId: product.id, // Use hardcoded product ID
       stripeSubscriptionId: stripeSubscription.id,
       stripeCustomerId: stripeSubscription.customer as string,
       status: this.mapStripeStatus(stripeSubscription.status),

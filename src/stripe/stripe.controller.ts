@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards, Request, Headers, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiHeader } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Request, Headers, Req, Get, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import { StripeService } from './stripe.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -18,6 +18,15 @@ export class StripeController {
   @UseGuards(JwtAuthGuard)
   async createCheckoutSession(@Request() req, @Body() body: { productId: string }) {
     return this.stripeService.createCheckoutSession(body.productId, req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Handle Stripe checkout success redirect' })
+  @ApiResponse({ status: 200, description: 'Subscription activated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid session' })
+  @ApiQuery({ name: 'session_id', description: 'Stripe checkout session ID' })
+  @Get('success')
+  async handleSuccess(@Query('session_id') sessionId: string) {
+    return this.stripeService.handleCheckoutSuccess(sessionId);
   }
 
   @ApiOperation({ summary: 'Handle Stripe webhook events' })

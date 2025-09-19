@@ -1,61 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Product } from '../entities/product.entity';
-import { CreateProductDto, UpdateProductDto, ProductResponseDto } from '../dto/product.dto';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ProductsService {
-  constructor(
-    @InjectRepository(Product)
-    private productRepository: Repository<Product>,
-  ) {}
-
-  async create(createProductDto: CreateProductDto): Promise<Product> {
-    const product = this.productRepository.create({
-      ...createProductDto,
-      currency: createProductDto.currency || 'USD',
-      isActive: createProductDto.isActive ?? true,
-      isSubscription: createProductDto.isSubscription ?? false,
-    });
-
-    return this.productRepository.save(product);
-  }
-
-  async findAll(): Promise<Product[]> {
-    return this.productRepository.find({
-      where: { isActive: true },
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async findOne(id: string): Promise<Product> {
-    const product = await this.productRepository.findOne({ where: { id } });
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-    return product;
-  }
-
-  async update(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
-    const product = await this.findOne(id);
-    Object.assign(product, updateProductDto);
-    return this.productRepository.save(product);
-  }
-
-  async remove(id: string): Promise<void> {
-    const product = await this.findOne(id);
-    product.isActive = false;
-    await this.productRepository.save(product);
-  }
-
-  async findByStripePriceId(stripePriceId: string): Promise<Product> {
-    const product = await this.productRepository.findOne({ 
-      where: { stripePriceId } 
-    });
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-    return product;
+  // Hardcoded subscription product
+  getSubscriptionProduct() {
+    return {
+      id: 'kumu-coaching-subscription',
+      name: 'Kumu Coaching Premium',
+      description: 'Premium coaching subscription with personalized sessions',
+      price: 20.99,
+      currency: 'USD',
+      stripeProductId: 'prod_T4wyxMacGpdDKB',
+      stripePriceId: 'price_1S8n4wFooGVEYWinxi5NxFSL',
+      isActive: true,
+      isSubscription: true,
+      billingInterval: 'year',
+      trialPeriodDays: 7,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 }

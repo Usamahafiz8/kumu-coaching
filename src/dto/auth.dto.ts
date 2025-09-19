@@ -65,11 +65,20 @@ export class ForgotPasswordDto {
 
 export class ResetPasswordDto {
   @ApiProperty({
-    description: 'Password reset token received via email',
-    example: 'abc123def456'
+    description: '6-digit verification code received via email',
+    example: '123456',
+    pattern: '^[0-9]{6}$'
   })
   @IsString()
-  token: string;
+  code: string;
+
+  @ApiProperty({
+    description: 'User email address',
+    example: 'user@example.com',
+    format: 'email'
+  })
+  @IsEmail()
+  email: string;
 
   @ApiProperty({
     description: 'New password (minimum 6 characters)',
