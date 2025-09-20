@@ -120,11 +120,51 @@ export class StripeService {
     }
   }
 
+  async trackPromoCodeUsage(session: any): Promise<void> {
+    try {
+      // Check if any promotion codes were used in this session
+      if (session.total_details?.breakdown?.discounts && session.total_details.breakdown.discounts.length > 0) {
+        console.log('🎯 Promo code used in session:', session.id);
+        
+        // Get the discount details
+        const discounts = session.total_details.breakdown.discounts;
+        
+        for (const discount of discounts) {
+          if (discount.discount?.coupon?.id) {
+            const couponId = discount.discount.coupon.id;
+            
+            // Get the coupon details from Stripe to find the promo code
+            const coupon = await this.stripe.coupons.retrieve(couponId);
+            
+            if (coupon.metadata && coupon.metadata.promo_code) {
+              const promoCodeValue = coupon.metadata.promo_code;
+              
+              // Find the promo code in our database
+              const promoCodes = await this.promoCodesService.getAllPromoCodes();
+              const promoCode = promoCodes.find(pc => pc.code === promoCodeValue);
+              
+              if (promoCode) {
+                // Increment the usage count
+                await this.promoCodesService.usePromoCode(promoCode.code);
+                console.log(`✅ Tracked usage for promo code: ${promoCode.code} (${promoCode.influencerName || 'No influencer'})`);
+              } else {
+                console.log(`⚠️ Promo code ${promoCodeValue} not found in database`);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error tracking promo code usage:', error);
+      // Don't throw error - we don't want to break the subscription creation
+    }
+  }
+
   async handleCheckoutSuccess(sessionId: string): Promise<{ message: string; subscription?: any }> {
     try {
       // Retrieve the checkout session from Stripe
       const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['customer']
+        expand: ['customer', 'line_items']
       });
 
       if (!session.metadata) {
@@ -134,6 +174,9 @@ export class StripeService {
       const { userId, productId } = session.metadata;
 
       if (session.payment_status === 'paid') {
+        // Track promo code usage if any was used
+        await this.trackPromoCodeUsage(session);
+
         // Create a one-year subscription in our database
         const product = this.productsService.getSubscriptionProduct();
         const now = new Date();
