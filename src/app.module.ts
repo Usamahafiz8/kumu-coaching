@@ -11,10 +11,14 @@ import { ProductsModule } from './products/products.module';
 import { StripeModule } from './stripe/stripe.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AdminModule } from './admin/admin.module';
+import { InfluencersModule } from './influencers/influencers.module';
 import { User } from './entities/user.entity';
 import { Product } from './entities/product.entity';
 import { Subscription } from './entities/subscription.entity';
 import { PromoCode } from './entities/promo-code.entity';
+import { Influencer } from './entities/influencer.entity';
+import { Commission } from './entities/commission.entity';
+import { WithdrawalRequest } from './entities/withdrawal-request.entity';
 
 @Module({
   imports: [
@@ -34,7 +38,7 @@ import { PromoCode } from './entities/promo-code.entity';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_DATABASE'),
-        entities: [User, Product, Subscription, PromoCode],
+        entities: [User, Product, Subscription, PromoCode, Influencer, Commission, WithdrawalRequest],
         synchronize: configService.get('NODE_ENV') === 'development',
         ssl:  { rejectUnauthorized: false },
       }),
@@ -47,6 +51,7 @@ import { PromoCode } from './entities/promo-code.entity';
     StripeModule,
     SubscriptionsModule,
     AdminModule,
+    InfluencersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

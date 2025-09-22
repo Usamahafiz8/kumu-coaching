@@ -58,6 +58,9 @@ export class PromoCode {
   status: PromoCodeStatus;
 
   @Column({ type: 'varchar', nullable: true })
+  influencerId: string; // ID of the influencer who owns this code
+
+  @Column({ type: 'varchar', nullable: true })
   influencerName: string; // Name of the influencer who owns this code
 
   @Column({ type: 'varchar', nullable: true })
@@ -68,6 +71,12 @@ export class PromoCode {
 
   @Column({ type: 'text', nullable: true })
   influencerNotes: string; // Additional notes about the influencer
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 10 })
+  commissionPercentage: number; // Commission percentage for the influencer
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  totalCommissions: number; // Total commissions earned from this code
 
   @CreateDateColumn()
   createdAt: Date;

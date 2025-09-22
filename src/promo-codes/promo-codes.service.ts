@@ -15,10 +15,12 @@ export interface CreatePromoCodeDto {
   maxUses?: number;
   validFrom?: Date;
   validUntil?: Date;
+  influencerId?: string;
   influencerName?: string;
   influencerEmail?: string;
   influencerSocialHandle?: string;
   influencerNotes?: string;
+  commissionPercentage?: number;
 }
 
 export interface UpdatePromoCodeDto {
@@ -69,10 +71,12 @@ export class PromoCodesService {
       maxUses: createDto.maxUses,
       validFrom: createDto.validFrom,
       validUntil: createDto.validUntil,
+      influencerId: createDto.influencerId,
       influencerName: createDto.influencerName,
       influencerEmail: createDto.influencerEmail,
       influencerSocialHandle: createDto.influencerSocialHandle,
       influencerNotes: createDto.influencerNotes,
+      commissionPercentage: createDto.commissionPercentage || 10,
     });
     
     const savedPromoCode = await this.promoCodeRepository.save(promoCode);
